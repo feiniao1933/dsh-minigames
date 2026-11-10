@@ -27,5 +27,6 @@
 - [x] dshopen 收录申请 Issue（`[plugin-add] dsh-minigames`）
 - [x] awesome-dsh-plugin 单文件 PR
 - [ ] 等 awesome CI 的仓库年龄 gate（仓库 2026-11-10 创建，约 24h 后可复跑）
-- [ ] 用真实使用截图补充到 Issue / 市场详情
+- [x] 真实使用截图：`screenshots/game-page.png`（通过 `screenshots.json` 声明），并在 dshopen Issue 评论中提供链接
+- [ ] 补充获胜庆祝动画截图
 - [ ] 可选：npm 登录后 `npm publish --access public`

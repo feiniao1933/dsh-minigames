@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 smoke/.client.test-build.js
 community/SUBMIT-LINKS.md
+/截屏*.png

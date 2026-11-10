@@ -25,9 +25,13 @@ plugin's row id is `minigames-box`; it can be disabled again with
 
 ## Screenshots
 
-Real captures of the game page and the victory celebration are pending and will
-be attached to the Open Plugin Market listing. (The repository deliberately
-ships no mock-up images.)
+The game box in the right sidebar (dark theme): game shelf, difficulty selector,
+sound toggle, local tally, board, and the restart/undo controls.
+
+![The mini games box in the DSH right sidebar](screenshots/game-page.png)
+
+A capture of the victory celebration will be added with the next release.
+The repository ships no mock-up images.
 
 ## Where it lives
 
