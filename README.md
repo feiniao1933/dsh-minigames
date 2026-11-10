@@ -1,8 +1,11 @@
 # dsh-minigames · 游戏盒子
 
-A mini-games box for the DSH Web right sidebar. The first game is **Gomoku
-(五子棋)** against the built-in AI in three difficulties; winning triggers a
-frame-wide celebration with confetti, fireworks and a trophy card.
+A mini-games box for the DSH Web right sidebar. It ships two games:
+
+- **Gomoku (五子棋)** against the built-in AI in three difficulties; winning
+  triggers a frame-wide celebration with confetti, fireworks and a trophy card.
+- **Sky shooter (打飞机)** — a WeChat-style arcade shooter: drag your plane,
+  dodge the descending enemies, auto-fire, chase a personal best.
 
 ## Install
 
@@ -25,12 +28,13 @@ plugin's row id is `minigames-box`; it can be disabled again with
 
 ## Screenshots
 
-The game box in the right sidebar (dark theme): game shelf, difficulty selector,
-sound toggle, local tally, board, and the restart/undo controls.
+The game box in the right sidebar (dark theme) with Gomoku: game shelf,
+difficulty selector, sound toggle, local tally, board, and the restart/undo
+controls.
 
 ![The mini games box in the DSH right sidebar](screenshots/game-page.png)
 
-A capture of the victory celebration will be added with the next release.
+Captures of the sky shooter and the victory celebration are still to come.
 The repository ships no mock-up images.
 
 ## Where it lives
@@ -49,13 +53,14 @@ Two ways in, both backed by the same tab type:
   capsule. If the panel is parked on another tab, the "+" control in its tab
   strip reopens the Start page.
 
-The game opens as a tab in the right sidebar: a game shelf at the top (five-in-a-row
-active, "more games" placeholder), the board, the status row, and the controls.
+The game opens as a tab in the right sidebar: a game shelf at the top (五子棋 /
+打飞机), the selected game below it, and "more games" placeholder row. Switching
+games keeps both games' state while the tab stays open.
 
 Because it is a regular tab type, it can be split, floated or moved between
 panes with the sidebar's own controls, and it stays mounted while hidden.
 
-## Playing
+## Gomoku
 
 - You play **black** and move first; the AI plays white.
 - **Difficulty is selectable** in the page (`简单 / 普通 / 困难`, default `困难`)
@@ -81,6 +86,21 @@ dictionaries); every non-artwork colour is a `--dsw-alias-*` theme token, so the
 page follows light/dark themes. The board wood, stones, trophy and confetti
 palette are artwork colours.
 
+## Sky shooter
+
+A compact remake of the classic WeChat airplane game, rendered on a `<canvas>`
+inside the same right-sidebar page.
+
+- **Drag anywhere on the screen** to move your plane (arrow keys / WASD work
+  too); bullets fire automatically.
+- Enemies descend in waves — small scouts, drifting fighters and slow heavy
+  bombers with a health bar. Shooting one scores 10 / 35 / 120 points.
+- You have **3 lives**; a collision costs one and grants brief invulnerability,
+  with screen shake. At zero lives the run ends and the **best score** is kept
+  in `localStorage`.
+- A short pause overlay appears when you switch games or the tab is hidden;
+  resume or restart from there. Mute silences the arcade sound effects too.
+
 ## Implementation
 
 | File | Role |
@@ -89,9 +109,10 @@ palette are artwork colours.
 | `cordis.patch.yml` | Inserts one Host entry (`minigames-box`). |
 | `index.js` | Host half; no Host behaviour, the Client module owns the rendering. |
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
-| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, difficulty selector, board UI, AI turn loop, placement/victory audio, record + preference persistence, `shell.overlay` celebration. |
+| `src/plane.js` | Pure sky-shooter simulation: fixed 360×600 world, seeded RNG, auto-fire, waves and enemy types, AABB collisions, particles, lives/score, pause/over phases. |
+| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas sky shooter (render/HUD/input), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
-| `build.mjs` | Concatenates `src/engine.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
+| `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
 | `locale/*.json` | Plugin title/description shown by Plugin Manager and Settings (8 locales). |
 | `icon.svg` | Bundle artwork: a Gomoku board with the winning stone ringed in gold. |
 
@@ -108,17 +129,20 @@ ctx.slots.register({ name: 'shell.overlay', id: 'dsh-minigames-celebration' }, C
 ## Tested
 
 - DSH `0.2.2-rc.1`, macOS, Web client (`dsh web`).
-- Engine tests: 156 assertions; UI smoke test: registration + server-rendered
-  page + celebration + win/lose/draw/undo state machine.
+- Gomoku engine: 156 assertions; sky shooter: 6417 checks; UI smoke test:
+  registration + server-rendered page + celebration + win/lose/draw/undo state
+  machine + arcade step/pause/input through the built bundle.
 
 ## Privacy
 
 The plugin makes no network requests and sends nothing anywhere. It stores only
 these browser-local preferences in `localStorage`:
 
-- `dsh.minigames.record.v1` – win/loss/draw tally
-- `dsh.minigames.difficulty.v1` – selected difficulty
+- `dsh.minigames.record.v1` – Gomoku win/loss/draw tally
+- `dsh.minigames.difficulty.v1` – selected Gomoku difficulty
 - `dsh.minigames.sound.v1` – sound on/off
+- `dsh.minigames.game.v1` – last selected game
+- `dsh.minigames.plane.best.v1` – sky-shooter best score
 
 ## License
 
@@ -129,8 +153,9 @@ MIT © 2026 Poboy. See [LICENSE](LICENSE).
 ```bash
 node build.mjs                    # rebuild client.js
 node build.mjs --test             # bundle with internals exposed, for smoke/ui.smoke.mjs
-node test/engine.test.mjs         # engine unit + self-play tests
-node smoke/ui.smoke.mjs           # registration + SSR render + game transitions
+node test/engine.test.mjs         # Gomoku engine unit + self-play tests
+node test/plane.test.mjs          # sky-shooter simulation tests
+node smoke/ui.smoke.mjs           # registration + SSR render + both games' state
 ```
 
 `smoke/ui.smoke.mjs` needs React in a scratch directory (it is a browser

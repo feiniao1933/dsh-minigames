@@ -1,7 +1,7 @@
 {
   "name": "dsh-minigames",
-  "version": "1.0.0",
-  "description": "Mini games box for the DSH right sidebar: Gomoku human vs AI with easy/normal/hard difficulty, placement sounds and a victory celebration.",
+  "version": "1.1.0",
+  "description": "Mini games box for the DSH right sidebar: Gomoku human vs AI with three difficulties, plus a WeChat-style sky shooter, placement sounds and a victory celebration.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -12,7 +12,11 @@
     "minigames",
     "game",
     "sidebar",
-    "web-ui"
+    "web-ui",
+    "arcade",
+    "shooter",
+    "canvas",
+    "games"
   ],
   "type": "module",
   "license": "MIT",
@@ -43,7 +47,9 @@
     "src/*.js",
     "build.mjs",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "screenshots/*.png",
+    "screenshots.json"
   ],
   "publishConfig": {
     "access": "public"

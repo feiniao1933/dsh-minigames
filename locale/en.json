@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Mini games box",
-    "description": "Adds a mini-games tab to the right sidebar. Play Gomoku against a hard AI and get a grand celebration when you win."
+    "description": "Adds a mini-games box tab to the right sidebar: Gomoku against an AI at three difficulties, plus a WeChat-style sky shooter with sounds and a victory celebration."
   }
 }

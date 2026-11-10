@@ -12,6 +12,7 @@
  */
 
 import { BOARD_SIZE, EMPTY, BLACK, WHITE, createBoard, isFiveAt, findWinLine, isFull, chooseMove } from './engine.js';
+import { PLANE_WORLD, PLANE_LIVES, createPlaneState, startPlane, pausePlane, resumePlane, stepPlane, movePlayerBy } from './plane.js';
 
 const NS = 'minigames';
 const PLUGIN_ID = 'dsh-minigames';
@@ -35,6 +36,9 @@ const DIFFICULTIES = {
   hard: { id: 'hard', maxDepth: 6, timeBudgetMs: 430 },
 };
 const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
+const GAME_ORDER = ['gomoku', 'plane'];
+const GAME_KEY = 'dsh.minigames.game.v1';
+const PLANE_BEST_KEY = 'dsh.minigames.plane.best.v1';
 const DEFAULT_DIFFICULTY = 'hard';
 const DIFFICULTY_KEY = 'dsh.minigames.difficulty.v1';
 const SOUND_KEY = 'dsh.minigames.sound.v1';
@@ -43,7 +47,7 @@ const DICT = {
   en: {
     'type.label': 'Mini games box',
     'guide.title': 'Mini games box',
-    'guide.description': 'Play Gomoku against a hard AI',
+    'guide.description': 'Gomoku and the classic sky shooter',
     'header.title': 'Mini games box',
     'header.subtitle': 'A quick break, right where you work',
     'launcher.title': 'Open the mini games box',
@@ -53,8 +57,23 @@ const DICT = {
     'difficulty.hard': 'Hard',
     'game.gomoku': 'Gomoku',
     'game.gomoku.desc': 'Human vs AI · {difficulty}',
+    'game.plane': 'Sky shooter',
+    'game.plane.desc': 'Arcade shooter · classic remake',
     'game.more': 'More games',
     'game.more.desc': 'Coming soon',
+    'plane.score': 'Score',
+    'plane.best': 'Best',
+    'plane.lives': 'Lives',
+    'plane.start': 'Start game',
+    'plane.restart': 'Play again',
+    'plane.pause': 'Pause',
+    'plane.resume': 'Resume',
+    'plane.pausedTitle': 'Paused',
+    'plane.overTitle': 'Game over',
+    'plane.newBest': 'New best!',
+    'plane.tipIdle': 'Drag the plane to dodge enemies. It fires automatically.',
+    'plane.hint': 'Drag to move · auto-fire · 3 lives',
+    'plane.final': 'Score {score} · Best {best}',
     'status.yourTurn': 'Your move',
     'status.aiThinking': 'AI is thinking…',
     'status.youWin': 'You win!',
@@ -86,7 +105,7 @@ const DICT = {
   zh: {
     'type.label': '游戏盒子',
     'guide.title': '游戏盒子',
-    'guide.description': '人机对弈五子棋，挑战困难 AI',
+    'guide.description': '五子棋 + 经典打飞机',
     'header.title': '游戏盒子',
     'header.subtitle': '在右侧面板随时来一局',
     'launcher.title': '打开游戏盒子',
@@ -96,8 +115,23 @@ const DICT = {
     'difficulty.hard': '困难',
     'game.gomoku': '五子棋',
     'game.gomoku.desc': '人机对弈 · {difficulty}',
+    'game.plane': '打飞机',
+    'game.plane.desc': '街机射击 · 经典复刻',
     'game.more': '更多游戏',
     'game.more.desc': '敬请期待',
+    'plane.score': '得分',
+    'plane.best': '最高',
+    'plane.lives': '生命',
+    'plane.start': '开始游戏',
+    'plane.restart': '再来一局',
+    'plane.pause': '暂停',
+    'plane.resume': '继续',
+    'plane.pausedTitle': '已暂停',
+    'plane.overTitle': '游戏结束',
+    'plane.newBest': '新纪录！',
+    'plane.tipIdle': '拖动飞机躲避敌机，子弹自动发射。',
+    'plane.hint': '拖动移动 · 自动开火 · 三条命',
+    'plane.final': '本局 {score} 分 · 最高 {best} 分',
     'status.yourTurn': '轮到你落子',
     'status.aiThinking': 'AI 正在思考…',
     'status.youWin': '你赢了！',
@@ -150,6 +184,7 @@ const CSS = `
   --mg-gold: #e8a324;
   --mg-gold-soft: rgba(255, 197, 61, .18);
 }
+.mgRoot[data-game="plane"] { overflow: hidden; }
 body[data-ds-dark-theme] .mgRoot {
   --mg-board-face-1: #c99c66;
   --mg-board-face-2: #a87b49;
@@ -194,18 +229,20 @@ body[data-ds-dark-theme] .mgRoot {
   background: var(--dsw-alias-bg-layer-1);
   border: .5px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
 }
+@media (hover: hover) { .mgCard:hover { background: var(--dsw-alias-interactive-bg-hover); } }
 .mgCard[data-active="true"] {
   border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 42%, transparent);
   background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, var(--dsw-alias-bg-layer-1));
 }
-.mgCardGhost { cursor: default; border-style: dashed; opacity: .78; }
+.mgCard:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .mgCardIcon {
   width: 27px; height: 27px; flex: none; display: flex; align-items: center; justify-content: center;
   border-radius: 8px; color: var(--dsw-alias-brand-primary);
   background: color-mix(in srgb, var(--dsw-alias-brand-primary) 11%, transparent);
 }
-.mgCardGhost .mgCardIcon { color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-layer-2); }
 .mgCardText { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .mgCardTitle { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mgCardDesc { font-size: 10.5px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -329,6 +366,48 @@ body[data-ds-dark-theme] .mgRoot {
 }
 .mgLauncher:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .mgLauncher:active { background: var(--dsw-alias-interactive-bg-active); }
+
+.mgMore {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 9px;
+  border: .5px dashed var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-tertiary); font-size: 11px;
+}
+.mgMorePlus { font-size: 13px; line-height: 1; }
+.mgPane { display: flex; flex-direction: column; gap: 12px; }
+.mgPane[hidden] { display: none !important; }
+.mgPanePlane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+/* Arcade game screen */
+.mgPlane { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; width: 100%; }
+.mgPlaneHud { display: flex; align-items: center; gap: 12px; min-height: 24px; }
+.mgPlaneHudBlock { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.mgPlaneHudLabel { font-size: 10.5px; color: var(--dsw-alias-label-tertiary); }
+.mgPlaneHudValue { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mgPlaneLives { margin-left: auto; display: flex; align-items: center; gap: 2px; color: var(--dsw-alias-state-error-primary); }
+.mgPlaneWrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.mgPlaneStage { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; outline: none; touch-action: none; }
+.mgPlaneCanvas {
+  display: block; border-radius: 14px; background: #0a1120; touch-action: none; cursor: grab;
+  box-shadow: 0 16px 32px -22px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(150, 195, 255, .14);
+}
+.mgPlaneCanvas:active { cursor: grabbing; }
+.mgPlaneStage:focus-visible .mgPlaneCanvas { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.mgPlaneOverlay {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: var(--mg-plane-width, 100%); height: var(--mg-plane-height, 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 9px; padding: 20px; text-align: center; border-radius: 14px;
+  background: rgba(7, 11, 21, .64); color: #eaf2ff;
+}
+.mgPlaneOverlayTitle { font-size: 17px; font-weight: 600; letter-spacing: .02em; }
+.mgPlaneOverlayText { max-width: 240px; font-size: 11.5px; line-height: 1.55; color: #9fb2cf; }
+.mgPlaneStats { font-size: 12.5px; color: #d7e4ff; font-variant-numeric: tabular-nums; }
+.mgPlaneNewBest { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #ffd76a; }
+.mgPlaneOverlay .mgBtn { flex: none; height: 32px; padding: 0 16px; background: rgba(255, 255, 255, .1); color: #eaf2ff; border-color: rgba(255, 255, 255, .18); }
+.mgPlaneOverlay .mgBtnPrimary { background: #4d6bfe; border-color: transparent; color: #fff; }
+@media (hover: hover) { .mgPlaneOverlay .mgBtn:hover:not(:disabled) { background: rgba(255, 255, 255, .18); } }
+@media (hover: hover) { .mgPlaneOverlay .mgBtnPrimary:hover:not(:disabled) { background: #4d6bfe; filter: brightness(1.08); } }
 
 /* Frame-wide victory celebration (shell.overlay). */
 .mgoLayer {
@@ -483,7 +562,7 @@ function readDifficulty() {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return DEFAULT_DIFFICULTY;
     const value = window.localStorage.getItem(DIFFICULTY_KEY);
-    return value !== null && value in DIFFICULTIES ? value : DEFAULT_DIFFICULTY;
+    return value !== null && Object.prototype.hasOwnProperty.call(DIFFICULTIES, value) ? value : DEFAULT_DIFFICULTY;
   } catch {
     return DEFAULT_DIFFICULTY;
   }
@@ -617,6 +696,128 @@ function playVictorySound(enabled) {
     osc.start(start);
     osc.stop(start + 0.34);
   }
+}
+
+/** Read the last selected game id. */
+function readActiveGame() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return 'gomoku';
+    const value = window.localStorage.getItem(GAME_KEY);
+    return value !== null && GAME_ORDER.includes(value) ? value : 'gomoku';
+  } catch {
+    return 'gomoku';
+  }
+}
+
+/** Persist the selected game id. */
+function writeActiveGame(id) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.setItem(GAME_KEY, id);
+  } catch {
+    /* storage disabled */
+  }
+}
+
+/** Best plane-shooter score kept in this browser. */
+function readPlaneBest() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return 0;
+    const raw = window.localStorage.getItem(PLANE_BEST_KEY);
+    const value = raw === null ? 0 : Number.parseInt(raw, 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Persist a new plane-shooter best score. */
+function writePlaneBest(score) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    if (!Number.isFinite(score) || score <= 0) return;
+    const current = readPlaneBest();
+    if (score <= current) return;
+    window.localStorage.setItem(PLANE_BEST_KEY, String(Math.floor(score)));
+  } catch {
+    /* storage disabled */
+  }
+}
+
+/** Rate limiter for the auto-fire blip so 7 shots/s do not turn into noise. */
+let lastShotSoundAt = 0;
+
+/** One soft square-wave blip per firing pair. */
+function playShotSound(enabled) {
+  if (!enabled) return;
+  const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+  if (now - lastShotSoundAt < 95) return;
+  lastShotSoundAt = now;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const start = context.currentTime;
+  const osc = context.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1240, start);
+  osc.frequency.exponentialRampToValueAtTime(820, start + 0.05);
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.035, start + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.06);
+  osc.connect(gain);
+  gain.connect(context.destination);
+  osc.start(start);
+  osc.stop(start + 0.07);
+}
+
+/** Short noise burst for an enemy explosion; bigger enemies sound lower. */
+function playExplosionSound(enabled, size) {
+  if (!enabled) return;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const start = context.currentTime;
+  const duration = 0.14 + Math.min(2, Math.max(0, size)) * 0.05;
+  const frames = Math.ceil(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frames, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < frames; i += 1) {
+    const progress = i / frames;
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - progress, 2.6);
+  }
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  const low = context.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 900 - Math.min(2, Math.max(0, size)) * 180;
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.16, start + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(low);
+  low.connect(gain);
+  gain.connect(context.destination);
+  source.start(start);
+  source.stop(start + duration + 0.01);
+}
+
+/** Descending tone when the player loses a life. */
+function playDamageSound(enabled) {
+  if (!enabled) return;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const start = context.currentTime;
+  const osc = context.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(240, start);
+  osc.frequency.exponentialRampToValueAtTime(80, start + 0.28);
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.09, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+  osc.connect(gain);
+  gain.connect(context.destination);
+  osc.start(start);
+  osc.stop(start + 0.32);
 }
 
 /** Release the audio context when the plugin unloads. */
@@ -1213,15 +1414,588 @@ function Board(props) {
   );
 }
 
+/* ------------------------------------------------------ arcade game (plane) */
+
+const PLANE_PARTICLE_COLORS = ['#ffd76a', '#ffe08a', '#ff9f43', '#ff6b6b'];
+const PLANE_ENEMY_PALETTE = {
+  scout: { body: '#ff9a9a', wing: '#e56a6a', ink: '#c14b4b' },
+  fighter: { body: '#ffc06b', wing: '#e69a3e', ink: '#b5742a' },
+  heavy: { body: '#ef7d6d', wing: '#c85a4c', ink: '#923c33' },
+};
+
+/** Shelf glyph for the arcade game: a swept-wing plane. */
+function PlaneGlyph({ size = 16, className }) {
+  return React.createElement(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true', className },
+    React.createElement('path', {
+      d: 'M8 1.6 10.2 6.9 14.1 8.7 10.1 9.4 8 14.4 5.9 9.4 1.9 8.7 5.8 6.9 8 1.6Z',
+      stroke: 'currentColor',
+      strokeWidth: '1.15',
+      strokeLinejoin: 'round',
+    }),
+    React.createElement('path', { d: 'M8 6.6v3.2', stroke: 'currentColor', strokeWidth: '1', strokeLinecap: 'round', opacity: '0.55' }),
+  );
+}
+
+/** One life heart in the arcade HUD. */
+function HeartGlyph({ filled }) {
+  return React.createElement(
+    'svg',
+    { width: 13, height: 13, viewBox: '0 0 16 16', 'aria-hidden': 'true', style: { opacity: filled ? 1 : 0.3 } },
+    React.createElement('path', {
+      d: 'M8 13.6 3.1 8.9A2.9 2.9 0 0 1 8 4.9a2.9 2.9 0 0 1 4.9 4L8 13.6Z',
+      fill: filled ? 'currentColor' : 'transparent',
+      stroke: 'currentColor',
+      strokeWidth: '1.2',
+    }),
+  );
+}
+
+/** Paint one enemy plane by type; the entity position is its centre. */
+function drawEnemyPlane(ctx, enemy) {
+  const palette = PLANE_ENEMY_PALETTE[enemy.type] || PLANE_ENEMY_PALETTE.scout;
+  const w = enemy.width;
+  const h = enemy.height;
+  const tilt = Math.max(-0.26, Math.min(0.26, (enemy.vx || 0) * 0.004));
+  ctx.save();
+  ctx.translate(enemy.x, enemy.y);
+  ctx.rotate(tilt);
+  /* wings */
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.5);
+  ctx.lineTo(-w * 0.5, h * 0.1);
+  ctx.lineTo(-w * 0.34, -h * 0.14);
+  ctx.lineTo(0, h * 0.02);
+  ctx.lineTo(w * 0.34, -h * 0.14);
+  ctx.lineTo(w * 0.5, h * 0.1);
+  ctx.closePath();
+  ctx.fillStyle = palette.wing;
+  ctx.fill();
+  /* fuselage */
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.42);
+  ctx.quadraticCurveTo(w * 0.17, h * 0.1, w * 0.13, -h * 0.32);
+  ctx.quadraticCurveTo(0, -h * 0.5, -w * 0.13, -h * 0.32);
+  ctx.quadraticCurveTo(-w * 0.17, h * 0.1, 0, h * 0.42);
+  ctx.closePath();
+  ctx.fillStyle = palette.body;
+  ctx.fill();
+  ctx.strokeStyle = palette.ink;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  /* cockpit */
+  ctx.beginPath();
+  ctx.ellipse(0, -h * 0.12, w * 0.1, h * 0.13, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+  ctx.fill();
+  /* damage bar for the big plane */
+  if (enemy.type === 'heavy' && enemy.maxHp > 0 && enemy.hp < enemy.maxHp) {
+    const ratio = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+    const barW = w * 0.86;
+    const barY = -h * 0.72;
+    ctx.fillStyle = 'rgba(8, 12, 20, 0.75)';
+    ctx.fillRect(-barW / 2, barY, barW, 3.2);
+    ctx.fillStyle = ratio > 0.5 ? '#7be0ad' : ratio > 0.25 ? '#ffd76a' : '#ff6b6b';
+    ctx.fillRect(-barW / 2 + 0.5, barY + 0.5, (barW - 1) * ratio, 2.2);
+  }
+  ctx.restore();
+}
+
+/** Paint the player plane: engine flame, wings, fuselage, cockpit and invuln blink. */
+function drawPlayerPlane(ctx, player, elapsed) {
+  const halfW = player.width / 2;
+  const halfH = player.height / 2;
+  const blink = player.invuln > 0 && Math.floor((elapsed || 0) * 14) % 2 === 0;
+  const flicker = 0.72 + 0.28 * Math.sin((elapsed || 0) * 32);
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.globalAlpha = blink ? 0.35 : 1;
+  /* flame */
+  ctx.beginPath();
+  ctx.moveTo(-halfW * 0.22, halfH * 0.8);
+  ctx.lineTo(0, halfH * 0.8 + halfH * 0.58 * flicker);
+  ctx.lineTo(halfW * 0.22, halfH * 0.8);
+  ctx.closePath();
+  ctx.fillStyle = '#ff9a4d';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-halfW * 0.1, halfH * 0.8);
+  ctx.lineTo(0, halfH * 0.8 + halfH * 0.32 * flicker);
+  ctx.lineTo(halfW * 0.1, halfH * 0.8);
+  ctx.closePath();
+  ctx.fillStyle = '#ffe9b0';
+  ctx.fill();
+  /* wings */
+  ctx.beginPath();
+  ctx.moveTo(0, -halfH * 0.15);
+  ctx.lineTo(halfW, halfH * 0.44);
+  ctx.lineTo(halfW * 0.42, halfH * 0.56);
+  ctx.lineTo(0, halfH * 0.32);
+  ctx.lineTo(-halfW * 0.42, halfH * 0.56);
+  ctx.lineTo(-halfW, halfH * 0.44);
+  ctx.closePath();
+  ctx.fillStyle = '#a9bcdd';
+  ctx.fill();
+  /* fuselage */
+  ctx.beginPath();
+  ctx.moveTo(0, -halfH);
+  ctx.quadraticCurveTo(halfW * 0.55, -halfH * 0.1, halfW * 0.32, halfH * 0.62);
+  ctx.lineTo(-halfW * 0.32, halfH * 0.62);
+  ctx.quadraticCurveTo(-halfW * 0.55, -halfH * 0.1, 0, -halfH);
+  ctx.closePath();
+  ctx.fillStyle = '#eef4ff';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(24, 36, 58, 0.55)';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  /* cockpit */
+  ctx.beginPath();
+  ctx.ellipse(0, -halfH * 0.3, halfW * 0.24, halfH * 0.27, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#4da3ff';
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Paint one arcade frame into the canvas (`view` comes from the resize pass). */
+function drawPlaneFrame(ctx, state, view) {
+  if (!ctx || !view) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, view.pxW, view.pxH);
+  ctx.fillStyle = view.gradient;
+  ctx.fillRect(0, 0, view.pxW, view.pxH);
+  const shake = state.shake || 0;
+  const offsetX = shake > 0 ? (Math.random() * 2 - 1) * shake * 5 : 0;
+  const offsetY = shake > 0 ? (Math.random() * 2 - 1) * shake * 4 : 0;
+  ctx.setTransform(view.paintScale, 0, 0, view.paintScale, offsetX * view.paintScale, offsetY * view.paintScale);
+
+  /* background stars */
+  ctx.fillStyle = 'rgba(214, 229, 255, 0.85)';
+  for (let i = 0; i < state.stars.length; i += 1) {
+    const star = state.stars[i];
+    ctx.globalAlpha = 0.2 + Math.min(1, star.size / 2) * 0.55;
+    ctx.fillRect(star.x, star.y, star.size, star.size * 2.2);
+  }
+  ctx.globalAlpha = 1;
+
+  /* bullets */
+  for (let i = 0; i < state.bullets.length; i += 1) {
+    const bullet = state.bullets[i];
+    ctx.fillStyle = 'rgba(90, 214, 255, 0.26)';
+    ctx.beginPath();
+    ctx.ellipse(bullet.x, bullet.y, bullet.width * 1.6, bullet.height * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c9f6ff';
+    ctx.beginPath();
+    ctx.ellipse(bullet.x, bullet.y, bullet.width * 0.55, bullet.height * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* enemies */
+  for (let i = 0; i < state.enemies.length; i += 1) drawEnemyPlane(ctx, state.enemies[i]);
+
+  /* particles */
+  for (let i = 0; i < state.particles.length; i += 1) {
+    const particle = state.particles[i];
+    const alpha = Math.max(0, Math.min(1, particle.life / particle.maxLife));
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = PLANE_PARTICLE_COLORS[particle.tone] || PLANE_PARTICLE_COLORS[0];
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.size * (0.45 + alpha), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  drawPlayerPlane(ctx, state.player, state.elapsed);
+}
+
+/** WeChat-style arcade shooter: canvas game screen, DOM HUD and overlays. */
+function PlaneGame(props) {
+  const { t, active, soundOnRef } = props;
+  const stageRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const gameRef = React.useRef(null);
+  const viewRef = React.useRef(null);
+  const activeRef = React.useRef(active);
+  const phaseRef = React.useRef('idle');
+  const hudRef = React.useRef({ score: 0, best: readPlaneBest(), lives: PLANE_LIVES, newBest: false });
+  const dragRef = React.useRef({ active: false, x: 0, y: 0 });
+  const resizeRef = React.useRef(null);
+  const bestBeforeRef = React.useRef(readPlaneBest());
+  const [phase, setPhase] = React.useState('idle');
+  const [hud, setHud] = React.useState(hudRef.current);
+
+  /* Leaving the page pauses the run instead of dropping the player mid-dodge. */
+  React.useEffect(() => {
+    activeRef.current = active;
+    const state = gameRef.current;
+    if (!active) {
+      if (state && state.phase === 'running') {
+        pausePlane(state);
+        phaseRef.current = 'paused';
+        setPhase('paused');
+      }
+      return undefined;
+    }
+    /* The pane may have been display:none when it was first measured; refit
+     * once the layout is real. */
+    const timer = window.setTimeout(() => {
+      if (resizeRef.current) resizeRef.current();
+    }, 30);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+
+  React.useEffect(() => {
+    const stage = stageRef.current;
+    const canvas = canvasRef.current;
+    if (!stage || !canvas) return undefined;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
+    const state = createPlaneState(((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0));
+    state.best = readPlaneBest();
+    gameRef.current = state;
+    phaseRef.current = state.phase;
+    hudRef.current = { score: 0, best: state.best, lives: state.lives, newBest: false };
+    setPhase(state.phase);
+    setHud(hudRef.current);
+    phaseRef.current = state.phase;
+
+    const dpr = Math.min(2, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
+    let raf = 0;
+    let lastFrame = 0;
+    let stopped = false;
+
+    const resize = () => {
+      const rect = stage.getBoundingClientRect();
+      if (!rect || rect.width < 1 || rect.height < 1) return;
+      const fit = Math.min(rect.width / PLANE_WORLD.width, rect.height / PLANE_WORLD.height);
+      if (!Number.isFinite(fit) || fit <= 0) return;
+      const cssW = Math.max(1, Math.floor(PLANE_WORLD.width * fit));
+      const cssH = Math.max(1, Math.floor(PLANE_WORLD.height * fit));
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      stage.style.setProperty('--mg-plane-width', `${cssW}px`);
+      stage.style.setProperty('--mg-plane-height', `${cssH}px`);
+      const pxW = Math.max(1, Math.round(cssW * dpr));
+      const pxH = Math.max(1, Math.round(cssH * dpr));
+      if (canvas.width !== pxW) canvas.width = pxW;
+      if (canvas.height !== pxH) canvas.height = pxH;
+      const gradient = ctx.createLinearGradient(0, 0, 0, pxH);
+      gradient.addColorStop(0, '#0a1120');
+      gradient.addColorStop(0.55, '#111e38');
+      gradient.addColorStop(1, '#0a1322');
+      viewRef.current = { pxW, pxH, paintScale: pxW / PLANE_WORLD.width, cssPerUnit: cssW / PLANE_WORLD.width, gradient };
+    };
+    resize();
+    resizeRef.current = resize;
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
+    if (observer) observer.observe(stage);
+    window.addEventListener('resize', resize);
+
+    const syncHud = (force) => {
+      const current = hudRef.current;
+      const over = state.phase === 'over';
+      const newBest = current.newBest || (over && state.score > bestBeforeRef.current);
+      if (!force && current.score === state.score && current.lives === state.lives && current.best === state.best && current.newBest === newBest) {
+        return;
+      }
+      const next = { score: state.score, lives: state.lives, best: state.best, newBest };
+      hudRef.current = next;
+      setHud(next);
+    };
+
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.hidden && state.phase === 'running') {
+        pausePlane(state);
+        phaseRef.current = 'paused';
+        setPhase('paused');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    const frame = (now) => {
+      if (stopped) return;
+      const previous = lastFrame || now;
+      lastFrame = now;
+      let dt = (now - previous) / 1000;
+      if (!Number.isFinite(dt) || dt < 0) dt = 0;
+      if (dt > 0.05) dt = 0.05;
+      if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
+        stepPlane(state, dt);
+        if (state.lastEvents && state.lastEvents.length > 0) {
+          for (let i = 0; i < state.lastEvents.length; i += 1) {
+            const event = state.lastEvents[i];
+            if (event.type === 'shot') playShotSound(soundOnRef.current);
+            else if (event.type === 'explode') playExplosionSound(soundOnRef.current, event.size || 1);
+            else if (event.type === 'damage') playDamageSound(soundOnRef.current);
+          }
+          state.lastEvents.length = 0;
+        }
+      }
+      if (activeRef.current && viewRef.current) drawPlaneFrame(ctx, state, viewRef.current);
+      if (state.phase !== phaseRef.current) {
+        phaseRef.current = state.phase;
+        if (state.phase === 'over') {
+          if (state.score > 0) writePlaneBest(state.score);
+          syncHud(true);
+        }
+        setPhase(state.phase);
+      }
+      syncHud(false);
+      raf = window.requestAnimationFrame(frame);
+    };
+    raf = window.requestAnimationFrame(frame);
+
+    const onPointerDown = (event) => {
+      if (!activeRef.current || !state || state.phase !== 'running') return;
+      dragRef.current = { active: true, x: event.clientX, y: event.clientY };
+      if (typeof canvas.setPointerCapture === 'function') {
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch (error) {
+          /* pointer capture is best effort */
+        }
+      }
+      if (stageRef.current && typeof stageRef.current.focus === 'function') stageRef.current.focus();
+      event.preventDefault();
+    };
+    const onPointerMove = (event) => {
+      const drag = dragRef.current;
+      const view = viewRef.current;
+      if (!drag.active || !view || state.phase !== 'running') return;
+      const scale = Math.max(0.001, view.cssPerUnit);
+      const dx = (event.clientX - drag.x) / scale;
+      const dy = (event.clientY - drag.y) / scale;
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      movePlayerBy(state, dx, dy);
+      event.preventDefault();
+    };
+    const onPointerUp = () => {
+      dragRef.current = { active: false, x: 0, y: 0 };
+    };
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointerleave', onPointerUp);
+
+    return () => {
+      stopped = true;
+      window.cancelAnimationFrame(raf);
+      resizeRef.current = null;
+      window.removeEventListener('resize', resize);
+      if (observer) observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+      canvas.removeEventListener('pointerleave', onPointerUp);
+      gameRef.current = null;
+    };
+  }, [soundOnRef]);
+
+  const startGame = React.useCallback(() => {
+    const state = gameRef.current;
+    if (!state) return;
+    const storedBest = readPlaneBest();
+    bestBeforeRef.current = storedBest;
+    startPlane(state, { best: storedBest });
+    if (state.lastEvents) state.lastEvents.length = 0;
+    phaseRef.current = 'running';
+    hudRef.current = { score: 0, best: state.best, lives: state.lives, newBest: false };
+    setHud(hudRef.current);
+    setPhase('running');
+    if (stageRef.current && typeof stageRef.current.focus === 'function') stageRef.current.focus();
+  }, []);
+
+  const togglePause = React.useCallback(() => {
+    const state = gameRef.current;
+    if (!state) return;
+    if (state.phase === 'running') {
+      pausePlane(state);
+      phaseRef.current = 'paused';
+      setPhase('paused');
+    } else if (state.phase === 'paused') {
+      resumePlane(state);
+      phaseRef.current = 'running';
+      setPhase('running');
+      if (stageRef.current && typeof stageRef.current.focus === 'function') stageRef.current.focus();
+    }
+  }, []);
+
+  const onKeyDown = React.useCallback(
+    (event) => {
+      const state = gameRef.current;
+      if (!state) return;
+      const key = event.key;
+      const step = 16;
+      if (state.phase === 'running') {
+        if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+          movePlayerBy(state, -step, 0);
+          event.preventDefault();
+          return;
+        }
+        if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+          movePlayerBy(state, step, 0);
+          event.preventDefault();
+          return;
+        }
+        if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+          movePlayerBy(state, 0, -step);
+          event.preventDefault();
+          return;
+        }
+        if (key === 'ArrowDown' || key === 's' || key === 'S') {
+          movePlayerBy(state, 0, step);
+          event.preventDefault();
+          return;
+        }
+      }
+      if (key === 'p' || key === 'P') {
+        togglePause();
+        event.preventDefault();
+      } else if (key === 'Enter' || key === ' ') {
+        if (state.phase === 'idle' || state.phase === 'over') {
+          startGame();
+          event.preventDefault();
+        }
+      }
+    },
+    [startGame, togglePause],
+  );
+
+  const lives = [];
+  for (let i = 0; i < PLANE_LIVES; i += 1) lives.push(React.createElement(HeartGlyph, { key: i, filled: i < hud.lives }));
+
+  const pauseGlyph =
+    phase === 'paused'
+      ? React.createElement(
+          'svg',
+          { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+          React.createElement('path', { d: 'M5 3.2v9.6L12.4 8 5 3.2Z', fill: 'currentColor' }),
+        )
+      : React.createElement(
+          'svg',
+          { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+          React.createElement('path', { d: 'M4.6 3h2.2v10H4.6zM9.2 3h2.2v10H9.2z', fill: 'currentColor' }),
+        );
+
+  let overlay = null;
+  if (phase === 'idle') {
+    overlay = React.createElement(
+      'div',
+      { className: 'mgPlaneOverlay' },
+      React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('game.plane')),
+      React.createElement('div', { className: 'mgPlaneOverlayText' }, t('plane.tipIdle')),
+      React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame }, t('plane.start')),
+    );
+  } else if (phase === 'paused') {
+    overlay = React.createElement(
+      'div',
+      { className: 'mgPlaneOverlay' },
+      React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('plane.pausedTitle')),
+      React.createElement(
+        'div',
+        { className: 'mgActions' },
+        React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: togglePause }, t('plane.resume')),
+        React.createElement('button', { type: 'button', className: 'mgBtn', onClick: startGame }, t('plane.restart')),
+      ),
+    );
+  } else if (phase === 'over') {
+    overlay = React.createElement(
+      'div',
+      { className: 'mgPlaneOverlay' },
+      React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('plane.overTitle')),
+      React.createElement('div', { className: 'mgPlaneStats' }, t('plane.final', { score: hud.score, best: hud.best })),
+      hud.newBest && React.createElement('div', { className: 'mgPlaneNewBest' }, t('plane.newBest')),
+      React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame }, t('plane.restart')),
+    );
+  }
+
+  return React.createElement(
+    'div',
+    { className: 'mgPlane' },
+    React.createElement(
+      'div',
+      { className: 'mgPlaneHud' },
+      React.createElement(
+        'div',
+        { className: 'mgPlaneHudBlock' },
+        React.createElement('span', { className: 'mgPlaneHudLabel' }, t('plane.score')),
+        React.createElement('b', { className: 'mgPlaneHudValue' }, hud.score),
+      ),
+      React.createElement(
+        'div',
+        { className: 'mgPlaneHudBlock' },
+        React.createElement('span', { className: 'mgPlaneHudLabel' }, t('plane.best')),
+        React.createElement('b', { className: 'mgPlaneHudValue' }, hud.best),
+      ),
+      React.createElement('div', { className: 'mgPlaneLives', 'aria-label': t('plane.lives') }, lives),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          className: 'mgIconBtn',
+          onClick: togglePause,
+          disabled: phase === 'idle' || phase === 'over',
+          title: phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+          'aria-label': phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+        },
+        pauseGlyph,
+      ),
+    ),
+    React.createElement(
+      'div',
+      { className: 'mgPlaneWrap' },
+      React.createElement(
+        'div',
+        {
+          className: 'mgPlaneStage',
+          ref: stageRef,
+          tabIndex: 0,
+          role: 'application',
+          'aria-label': t('game.plane'),
+          onKeyDown,
+        },
+        React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+        overlay,
+      ),
+    ),
+    React.createElement(
+      'div',
+      { className: 'mgActions' },
+      React.createElement(
+        'button',
+        { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame },
+        phase === 'idle' ? t('plane.start') : t('plane.restart'),
+      ),
+      React.createElement(
+        'button',
+        { type: 'button', className: 'mgBtn', onClick: togglePause, disabled: phase === 'idle' || phase === 'over' },
+        phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+      ),
+    ),
+    React.createElement('div', { className: 'mgHint' }, t('plane.hint')),
+  );
+}
+
 /* ------------------------------------------------------------ the game page */
 
 /** The right-sidebar tab body: game shelf, board, status, result and actions. */
 function GameBoxBody(props) {
   const { t } = props;
+  const tabInfo = typeof props.useTabInfo === 'function' ? props.useTabInfo() : null;
+  const tabVisible = tabInfo === null ? true : tabInfo.tab.visible !== false;
+  const tabVisibleRef = React.useRef(tabVisible);
   const [state, setState] = React.useState(createGame);
   const [record, setRecord] = React.useState(readRecord);
   const [difficulty, setDifficulty] = React.useState(readDifficulty);
   const [soundOn, setSoundOn] = React.useState(readSound);
+  const [activeGame, setActiveGame] = React.useState(readActiveGame);
+  const activeGameRef = React.useRef(activeGame);
   const soundRef = React.useRef(soundOn);
   const difficultyRef = React.useRef(difficulty);
   const [hover, setHover] = React.useState(-1);
@@ -1252,6 +2026,15 @@ function GameBoxBody(props) {
     writeDifficulty(difficulty);
   }, [difficulty]);
 
+  React.useEffect(() => {
+    activeGameRef.current = activeGame;
+    writeActiveGame(activeGame);
+  }, [activeGame]);
+
+  React.useEffect(() => {
+    tabVisibleRef.current = tabVisible;
+  }, [tabVisible]);
+
   /* The AI takes its turn shortly after the human's stone lands. The extra
    * delay keeps the "thinking" state readable; the engine itself is synchronous
    * and bounded by its time budget. */
@@ -1274,7 +2057,7 @@ function GameBoxBody(props) {
         moveIndex = emergencyMove(state.board);
       }
       if (cancelled || moveIndex < 0) return;
-      playStoneSound(AI, soundRef.current);
+      playStoneSound(AI, soundRef.current && activeGameRef.current === 'gomoku' && tabVisibleRef.current);
       setState((current) => {
         if (current.phase !== 'playing' || current.turn !== AI) return current;
         if (current.history.length !== state.history.length) return current;
@@ -1296,6 +2079,7 @@ function GameBoxBody(props) {
     const key = state.phase === 'won' ? 'win' : state.phase === 'lost' ? 'lose' : 'draw';
     setRecord((current) => ({ ...current, [key]: current[key] + 1 }));
     if (state.phase !== 'won') return;
+    if (activeGameRef.current !== 'gomoku') return;
     playVictorySound(soundRef.current);
     celebration.trigger({
       kicker: t('win.kicker'),
@@ -1336,20 +2120,23 @@ function GameBoxBody(props) {
       if (!humanTurn) return;
       setHover(-1);
       setKeyboardMode(false);
-      playStoneSound(HUMAN, soundRef.current);
+      playStoneSound(HUMAN, soundRef.current && activeGameRef.current === 'gomoku' && tabVisibleRef.current);
       setState((current) => applyMove(current, index, HUMAN));
     },
     [humanTurn],
   );
 
   const chooseDifficulty = React.useCallback((id) => {
-    if (id in DIFFICULTIES) setDifficulty(id);
+    if (Object.prototype.hasOwnProperty.call(DIFFICULTIES, id)) setDifficulty(id);
   }, []);
 
   const toggleSound = React.useCallback(() => {
     const next = !soundRef.current;
     setSoundOn(next);
-    if (next) playStoneSound(HUMAN, true);
+    if (next) {
+      if (activeGameRef.current === 'gomoku') playStoneSound(HUMAN, true);
+      else playShotSound(true);
+    }
   }, []);
 
   const handleHover = React.useCallback((index) => {
@@ -1403,9 +2190,13 @@ function GameBoxBody(props) {
     time: formatDuration(elapsedSeconds(state)),
   });
 
+  const selectGame = (id) => {
+    if (GAME_ORDER.includes(id)) setActiveGame((current) => (current === id ? current : id));
+  };
+
   return React.createElement(
     'div',
-    { className: 'mgRoot' },
+    { className: 'mgRoot', 'data-game': activeGame },
     React.createElement(
       'div',
       { className: 'mgHead' },
@@ -1431,145 +2222,160 @@ function GameBoxBody(props) {
           },
           React.createElement(SoundGlyph, { on: soundOn }),
         ),
-        React.createElement(
-          'div',
-          {
-            className: 'mgRecord',
-            title: t('record.title'),
-            'aria-label': `${t('record.title')}: ${t('record.win')} ${record.win}, ${t('record.lose')} ${record.lose}, ${t('record.draw')} ${record.draw}`,
-          },
-          React.createElement('b', { 'data-k': 'w' }, record.win),
-          React.createElement('span', { className: 'mgRecordSep' }, '/'),
-          React.createElement('b', { 'data-k': 'l' }, record.lose),
-          React.createElement('span', { className: 'mgRecordSep' }, '/'),
-          React.createElement('b', { 'data-k': 'd' }, record.draw),
-        ),
+        activeGame === 'gomoku' &&
+          React.createElement(
+            'div',
+            {
+              className: 'mgRecord',
+              title: t('record.title'),
+              'aria-label': `${t('record.title')}: ${t('record.win')} ${record.win}, ${t('record.lose')} ${record.lose}, ${t('record.draw')} ${record.draw}`,
+            },
+            React.createElement('b', { 'data-k': 'w' }, record.win),
+            React.createElement('span', { className: 'mgRecordSep' }, '/'),
+            React.createElement('b', { 'data-k': 'l' }, record.lose),
+            React.createElement('span', { className: 'mgRecordSep' }, '/'),
+            React.createElement('b', { 'data-k': 'd' }, record.draw),
+          ),
       ),
     ),
     React.createElement(
       'div',
       { className: 'mgShelf' },
-      React.createElement(
-        'div',
-        { className: 'mgCard', 'data-active': 'true', 'aria-current': 'true', 'aria-label': t('game.gomoku') },
-        React.createElement('span', { className: 'mgCardIcon' }, React.createElement(GameBoxGlyph, { size: 17 })),
+      GAME_ORDER.map((id) =>
         React.createElement(
-          'span',
-          { className: 'mgCardText' },
-          React.createElement('span', { className: 'mgCardTitle' }, t('game.gomoku')),
-          React.createElement('span', { className: 'mgCardDesc' }, t('game.gomoku.desc', { difficulty: difficultyLabel })),
-        ),
-      ),
-      React.createElement(
-        'div',
-        { className: 'mgCard mgCardGhost', 'aria-disabled': 'true' },
-        React.createElement(
-          'span',
-          { className: 'mgCardIcon' },
-          React.createElement(
-            'svg',
-            { width: 17, height: 17, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
-            React.createElement('path', { d: 'M8 3.2v9.6M3.2 8h9.6', stroke: 'currentColor', strokeWidth: '1.4', strokeLinecap: 'round' }),
-          ),
-        ),
-        React.createElement(
-          'span',
-          { className: 'mgCardText' },
-          React.createElement('span', { className: 'mgCardTitle' }, t('game.more')),
-          React.createElement('span', { className: 'mgCardDesc' }, t('game.more.desc')),
-        ),
-      ),
-    ),
-    React.createElement(
-      'div',
-      { className: 'mgDiffRow' },
-      React.createElement('span', { className: 'mgDiffLabel' }, t('difficulty.label')),
-      React.createElement(
-        'div',
-        { className: 'mgSeg', role: 'group', 'aria-label': t('difficulty.label') },
-        DIFFICULTY_ORDER.map((id) =>
-          React.createElement(
-            'button',
-            {
-              key: id,
-              type: 'button',
-              className: 'mgSegBtn',
-              'data-active': difficulty === id ? 'true' : 'false',
-              'aria-pressed': difficulty === id,
-              onClick: () => chooseDifficulty(id),
-            },
-            t(`difficulty.${id}`),
-          ),
-        ),
-      ),
-    ),
-    React.createElement(
-      'div',
-      { className: 'mgGame' },
-      React.createElement(
-        'div',
-        { className: 'mgStatusRow', role: 'status', 'aria-live': 'polite' },
-        React.createElement('span', { className: 'mgDot', 'data-tone': statusTone, 'aria-hidden': 'true' }),
-        React.createElement('span', { className: 'mgStatusText' }, statusText),
-        React.createElement('span', { className: 'mgMoveCount' }, t('move.count', { n: state.history.length })),
-      ),
-      React.createElement(
-        'div',
-        { className: 'mgBoardWrap' },
-        React.createElement(Board, {
-          board: state.board,
-          t,
-          winLine: state.winLine,
-          lastMove: state.lastMove,
-          hover,
-          cursor,
-          keyboardMode,
-          disabled: !humanTurn,
-          onHover: handleHover,
-          onPick: place,
-          onKeyDown,
-        }),
-      ),
-      state.phase !== 'playing' &&
-        React.createElement(
-          'div',
+          'button',
           {
-            className: 'mgResult',
-            'data-result': state.phase === 'won' ? 'win' : state.phase === 'draw' ? 'draw' : 'lose',
-            role: 'status',
-            'aria-live': 'polite',
+            key: id,
+            type: 'button',
+            className: 'mgCard',
+            'data-active': activeGame === id ? 'true' : 'false',
+            'aria-pressed': activeGame === id,
+            onClick: () => selectGame(id),
           },
           React.createElement(
             'span',
-            { className: 'mgResultIcon', 'aria-hidden': 'true' },
-            state.phase === 'won'
-              ? React.createElement(TrophyGlyph, { className: 'mgResultTrophy' })
-              : React.createElement(
-                  'svg',
-                  { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none' },
-                  React.createElement('circle', { cx: 8, cy: 8, r: 6, stroke: 'currentColor', strokeWidth: '1.3' }),
-                  state.phase === 'draw'
-                    ? React.createElement('path', { d: 'M5 8h6', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round' })
-                    : React.createElement('path', { d: 'M6 6l4 4M10 6l-4 4', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round' }),
-                ),
+            { className: 'mgCardIcon' },
+            id === 'gomoku' ? React.createElement(GameBoxGlyph, { size: 17 }) : React.createElement(PlaneGlyph, { size: 17 }),
           ),
           React.createElement(
             'span',
-            { className: 'mgResultText' },
-            state.phase === 'won' ? t('result.youWin') : state.phase === 'draw' ? t('result.draw') : t('result.aiWin'),
+            { className: 'mgCardText' },
+            React.createElement('span', { className: 'mgCardTitle' }, t(id === 'gomoku' ? 'game.gomoku' : 'game.plane')),
+            React.createElement(
+              'span',
+              { className: 'mgCardDesc' },
+              id === 'gomoku' ? t('game.gomoku.desc', { difficulty: difficultyLabel }) : t('game.plane.desc'),
+            ),
           ),
-          React.createElement('span', { className: 'mgResultMeta' }, resultMeta),
         ),
+      ),
+    ),
+    React.createElement(
+      'div',
+      { className: 'mgMore', 'aria-disabled': 'true' },
+      React.createElement('span', { className: 'mgMorePlus' }, '+'),
+      `${t('game.more')} · ${t('game.more.desc')}`,
+    ),
+    React.createElement(
+      'div',
+      { className: 'mgPane', hidden: activeGame !== 'gomoku' },
       React.createElement(
         'div',
-        { className: 'mgActions' },
-        React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: restart }, t('action.restart')),
-        React.createElement('button', { type: 'button', className: 'mgBtn', onClick: undo, disabled: !canUndo }, t('action.undo')),
+        { className: 'mgDiffRow' },
+        React.createElement('span', { className: 'mgDiffLabel' }, t('difficulty.label')),
+        React.createElement(
+          'div',
+          { className: 'mgSeg', role: 'group', 'aria-label': t('difficulty.label') },
+          DIFFICULTY_ORDER.map((id) =>
+            React.createElement(
+              'button',
+              {
+                key: id,
+                type: 'button',
+                className: 'mgSegBtn',
+                'data-active': difficulty === id ? 'true' : 'false',
+                'aria-pressed': difficulty === id,
+                onClick: () => chooseDifficulty(id),
+              },
+              t(`difficulty.${id}`),
+            ),
+          ),
+        ),
       ),
-      React.createElement('div', { className: 'mgHint' }, t('hint.rules')),
+      React.createElement(
+        'div',
+        { className: 'mgGame' },
+        React.createElement(
+          'div',
+          { className: 'mgStatusRow', role: 'status', 'aria-live': 'polite' },
+          React.createElement('span', { className: 'mgDot', 'data-tone': statusTone, 'aria-hidden': 'true' }),
+          React.createElement('span', { className: 'mgStatusText' }, statusText),
+          React.createElement('span', { className: 'mgMoveCount' }, t('move.count', { n: state.history.length })),
+        ),
+        React.createElement(
+          'div',
+          { className: 'mgBoardWrap' },
+          React.createElement(Board, {
+            board: state.board,
+            t,
+            winLine: state.winLine,
+            lastMove: state.lastMove,
+            hover,
+            cursor,
+            keyboardMode,
+            disabled: !humanTurn,
+            onHover: handleHover,
+            onPick: place,
+            onKeyDown,
+          }),
+        ),
+        state.phase !== 'playing' &&
+          React.createElement(
+            'div',
+            {
+              className: 'mgResult',
+              'data-result': state.phase === 'won' ? 'win' : state.phase === 'draw' ? 'draw' : 'lose',
+              role: 'status',
+              'aria-live': 'polite',
+            },
+            React.createElement(
+              'span',
+              { className: 'mgResultIcon', 'aria-hidden': 'true' },
+              state.phase === 'won'
+                ? React.createElement(TrophyGlyph, { className: 'mgResultTrophy' })
+                : React.createElement(
+                    'svg',
+                    { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none' },
+                    React.createElement('circle', { cx: 8, cy: 8, r: 6, stroke: 'currentColor', strokeWidth: '1.3' }),
+                    state.phase === 'draw'
+                      ? React.createElement('path', { d: 'M5 8h6', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round' })
+                      : React.createElement('path', { d: 'M6 6l4 4M10 6l-4 4', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round' }),
+                  ),
+            ),
+            React.createElement(
+              'span',
+              { className: 'mgResultText' },
+              state.phase === 'won' ? t('result.youWin') : state.phase === 'draw' ? t('result.draw') : t('result.aiWin'),
+            ),
+            React.createElement('span', { className: 'mgResultMeta' }, resultMeta),
+          ),
+        React.createElement(
+          'div',
+          { className: 'mgActions' },
+          React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: restart }, t('action.restart')),
+          React.createElement('button', { type: 'button', className: 'mgBtn', onClick: undo, disabled: !canUndo }, t('action.undo')),
+        ),
+        React.createElement('div', { className: 'mgHint' }, t('hint.rules')),
+      ),
+    ),
+    React.createElement(
+      'div',
+      { className: 'mgPane mgPanePlane', hidden: activeGame !== 'plane' },
+      React.createElement(PlaneGame, { t, active: activeGame === 'plane' && tabVisible, soundOnRef: soundRef }),
     ),
   );
 }
+
 
 /* ------------------------------------------------------------- registration */
 
@@ -1698,6 +2504,21 @@ const __mgTestExports = {
   createLauncher,
   DIFFICULTIES,
   DIFFICULTY_ORDER,
+  GAME_ORDER,
+  readActiveGame,
+  writeActiveGame,
+  readPlaneBest,
+  writePlaneBest,
+  plane: {
+    PLANE_WORLD,
+    PLANE_LIVES,
+    createPlaneState,
+    startPlane,
+    pausePlane,
+    resumePlane,
+    stepPlane,
+    movePlayerBy,
+  },
   readDifficulty,
   readSound,
   writeDifficulty,

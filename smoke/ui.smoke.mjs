@@ -184,6 +184,18 @@ for (const label of ['简单', '普通', '困难']) assert.ok(html.includes(labe
 assert.ok(html.includes('aria-pressed="true"'), 'hard is the pressed option');
 assert.ok(html.includes('mgIconBtn'), 'sound toggle renders');
 assert.ok(html.includes('关闭音效'), 'sound toggle is on by default');
+
+/* Second game: WeChat-style sky shooter */
+assert.equal((html.match(/class="mgCard"/g) ?? []).length, 2, 'two playable games in the shelf');
+assert.ok(html.includes('打飞机'), 'sky shooter card renders');
+assert.ok(html.includes('经典复刻'), 'sky shooter card describes itself');
+assert.ok(html.includes('mgMore'), 'the "more games" placeholder renders');
+assert.ok(html.includes('mgPanePlane'), 'the arcade pane is mounted');
+assert.ok(html.includes('mgPlaneCanvas'), 'the arcade canvas is mounted');
+assert.ok(html.includes('开始游戏'), 'the arcade idle overlay offers a start button');
+assert.ok(html.includes('拖动移动'), 'the arcade hint renders');
+assert.ok(html.includes('hidden=""'), 'the inactive pane is hidden from layout');
+
 assert.ok(html.includes('轮到你落子'), 'human moves first');
 assert.ok(html.includes('重新开始') && html.includes('悔棋'), 'controls are present');
 assert.ok(html.includes('aria-label="五子棋棋盘'), 'board is labelled for assistive tech');
@@ -220,6 +232,35 @@ assert.equal(renderToStaticMarkup(React.createElement(moduleExports.__test.Celeb
 
 const { createGame, applyMove, undoMove, elapsedSeconds, emergencyMove } = moduleExports.__test;
 const prefs = moduleExports.__test;
+
+/* Preferences + arcade simulation through the built bundle */
+assert.deepEqual(prefs.GAME_ORDER, ['gomoku', 'plane']);
+assert.equal(prefs.readActiveGame(), 'gomoku', 'gomoku is the default game');
+prefs.writeActiveGame('plane');
+assert.equal(prefs.readActiveGame(), 'plane', 'selected game round-trips');
+prefs.writeActiveGame('gomoku');
+assert.equal(prefs.readPlaneBest(), 0, 'plane best starts at zero');
+prefs.writePlaneBest(321);
+assert.equal(prefs.readPlaneBest(), 321, 'plane best persists');
+prefs.writePlaneBest(100);
+assert.equal(prefs.readPlaneBest(), 321, 'plane best never regresses');
+
+const planeSim = prefs.plane;
+const shooter = planeSim.createPlaneState(7);
+planeSim.startPlane(shooter, { best: 0 });
+assert.equal(shooter.phase, 'running');
+for (let i = 0; i < 600; i += 1) planeSim.stepPlane(shooter, 1 / 60);
+assert.ok(shooter.elapsed > 9.9 && shooter.bullets.length > 0, 'arcade simulation steps inside the bundle');
+assert.ok(shooter.score >= 0 && Number.isFinite(shooter.score));
+const beforeScore = shooter.score;
+planeSim.pausePlane(shooter);
+for (let i = 0; i < 60; i += 1) planeSim.stepPlane(shooter, 1 / 60);
+assert.equal(shooter.score, beforeScore, 'paused arcade simulation does not advance');
+planeSim.resumePlane(shooter);
+assert.equal(shooter.phase, 'running');
+const startX = shooter.player.x;
+planeSim.movePlayerBy(shooter, -30, 0);
+assert.ok(shooter.player.x < startX, 'arcade input moves the plane');
 assert.deepEqual(prefs.DIFFICULTY_ORDER, ['easy', 'normal', 'hard']);
 for (const id of prefs.DIFFICULTY_ORDER) {
   assert.ok(prefs.DIFFICULTIES[id].maxDepth <= 6 && prefs.DIFFICULTIES[id].timeBudgetMs <= 430);
