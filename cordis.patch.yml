@@ -1,0 +1,6 @@
+# Mini-games box for the DSH right sidebar.
+# Inserts one Host plugin row; its Client half contributes a right-sidebar tab
+# type ("游戏盒子") and the frame-wide victory celebration layer.
+- insert:
+    - id: minigames-box
+      name: dsh-minigames

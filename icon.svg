@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mini games box: a Gomoku board with black and white stones">
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5ddb3"/>
+      <stop offset="0.55" stop-color="#e6bd85"/>
+      <stop offset="1" stop-color="#d4a468"/>
+    </linearGradient>
+    <radialGradient id="blackStone" cx="0.36" cy="0.28" r="0.8">
+      <stop offset="0" stop-color="#7d7d7d"/>
+      <stop offset="0.35" stop-color="#2c2c2c"/>
+      <stop offset="1" stop-color="#050505"/>
+    </radialGradient>
+    <radialGradient id="whiteStone" cx="0.36" cy="0.28" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#f1efea"/>
+      <stop offset="1" stop-color="#cfcac1"/>
+    </radialGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#board)"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="14.5" fill="none" stroke="#a97842" stroke-opacity="0.55"/>
+  <g stroke="#8a5a2b" stroke-opacity="0.62" stroke-width="1.5" stroke-linecap="round">
+    <path d="M15 15h34M15 26h34M15 37h34M15 48h34"/>
+    <path d="M15 15v34M26 15v34M37 15v34M48 15v34"/>
+  </g>
+  <circle cx="26" cy="26" r="7" fill="url(#blackStone)"/>
+  <circle cx="37" cy="37" r="7" fill="url(#whiteStone)" stroke="#b8b1a5" stroke-opacity="0.7"/>
+  <circle cx="48" cy="26" r="7" fill="url(#blackStone)"/>
+  <circle cx="15" cy="48" r="7" fill="url(#whiteStone)" stroke="#b8b1a5" stroke-opacity="0.7"/>
+  <circle cx="48" cy="26" r="7" fill="none" stroke="#ffc53d" stroke-width="1.6" stroke-opacity="0.9"/>
+</svg>
