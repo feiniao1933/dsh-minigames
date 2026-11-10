@@ -1658,20 +1658,23 @@ window.__ModuleLoader__.load({
     .mgMorePlus { font-size: 13px; line-height: 1; }
     .mgPane { display: flex; flex-direction: column; gap: 12px; }
     .mgPane[hidden] { display: none !important; }
-    .mgPanePlane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    .mgPanePlane { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
 
     /* Arcade game screen */
-    .mgPlane { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; width: 100%; }
+    .mgPlane { display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-height: 0; width: 100%; overflow: hidden; }
     .mgPlaneHud { display: flex; align-items: center; gap: 12px; min-height: 24px; }
     .mgPlaneHudBlock { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
     .mgPlaneHudLabel { font-size: 10.5px; color: var(--dsw-alias-label-tertiary); }
     .mgPlaneHudValue { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .mgPlaneLives { margin-left: auto; display: flex; align-items: center; gap: 2px; color: var(--dsw-alias-state-error-primary); }
-    .mgPlaneWrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
-    .mgPlaneStage { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; outline: none; touch-action: none; }
+    .mgPlaneWrap { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; }
+    .mgPlaneStage {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      border-radius: 12px; outline: none; touch-action: none; overflow: hidden;
+    }
     .mgPlaneCanvas {
-      display: block; border-radius: 14px; background: #0a1120; touch-action: none; cursor: grab;
-      box-shadow: 0 16px 32px -22px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(150, 195, 255, .14);
+      display: block; max-width: 100%; max-height: 100%;
+      border-radius: 12px; background: #0d1a2b; touch-action: none; cursor: grab;
     }
     .mgPlaneCanvas:active { cursor: grabbing; }
     .mgPlaneStage:focus-visible .mgPlaneCanvas { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
@@ -2698,11 +2701,12 @@ window.__ModuleLoader__.load({
 
     /* ------------------------------------------------------ arcade game (plane) */
 
-    const PLANE_PARTICLE_COLORS = ['#ffd76a', '#ffe08a', '#ff9f43', '#ff6b6b'];
-    const PLANE_ENEMY_PALETTE = {
-      scout: { body: '#ff9a9a', wing: '#e56a6a', ink: '#c14b4b' },
-      fighter: { body: '#ffc06b', wing: '#e69a3e', ink: '#b5742a' },
-      heavy: { body: '#ef7d6d', wing: '#c85a4c', ink: '#923c33' },
+    const PLANE_PARTICLE_COLORS = ['#ffffff', '#ffe08a', '#ffb347', '#ff8a5c'];
+    /** Flat greys for the three enemy sizes, in the spirit of the WeChat remake. */
+    const PLANE_ENEMY_FILL = {
+      scout: '#c9d3e0',
+      fighter: '#aab7c8',
+      heavy: '#8e9cae',
     };
 
     /** Shelf glyph for the arcade game: a swept-wing plane. */
@@ -2734,156 +2738,111 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /** Paint one enemy plane by type; the entity position is its centre. */
+    /** Paint one enemy plane as a flat silhouette; the entity position is its centre. */
     function drawEnemyPlane(ctx, enemy) {
-      const palette = PLANE_ENEMY_PALETTE[enemy.type] || PLANE_ENEMY_PALETTE.scout;
-      const w = enemy.width;
-      const h = enemy.height;
-      const tilt = Math.max(-0.26, Math.min(0.26, (enemy.vx || 0) * 0.004));
+      const fill = PLANE_ENEMY_FILL[enemy.type] || PLANE_ENEMY_FILL.scout;
+      const halfW = enemy.width / 2;
+      const halfH = enemy.height / 2;
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
-      ctx.rotate(tilt);
-      /* wings */
+      ctx.rotate(Math.PI);
       ctx.beginPath();
-      ctx.moveTo(0, h * 0.5);
-      ctx.lineTo(-w * 0.5, h * 0.1);
-      ctx.lineTo(-w * 0.34, -h * 0.14);
-      ctx.lineTo(0, h * 0.02);
-      ctx.lineTo(w * 0.34, -h * 0.14);
-      ctx.lineTo(w * 0.5, h * 0.1);
+      ctx.moveTo(0, -halfH);
+      ctx.lineTo(halfW * 0.2, -halfH * 0.2);
+      ctx.lineTo(halfW, halfH * 0.3);
+      ctx.lineTo(halfW * 0.22, halfH * 0.32);
+      ctx.lineTo(halfW * 0.28, halfH * 0.8);
+      ctx.lineTo(0, halfH * 0.52);
+      ctx.lineTo(-halfW * 0.28, halfH * 0.8);
+      ctx.lineTo(-halfW * 0.22, halfH * 0.32);
+      ctx.lineTo(-halfW, halfH * 0.3);
+      ctx.lineTo(-halfW * 0.2, -halfH * 0.2);
       ctx.closePath();
-      ctx.fillStyle = palette.wing;
+      ctx.fillStyle = fill;
       ctx.fill();
-      /* fuselage */
-      ctx.beginPath();
-      ctx.moveTo(0, h * 0.42);
-      ctx.quadraticCurveTo(w * 0.17, h * 0.1, w * 0.13, -h * 0.32);
-      ctx.quadraticCurveTo(0, -h * 0.5, -w * 0.13, -h * 0.32);
-      ctx.quadraticCurveTo(-w * 0.17, h * 0.1, 0, h * 0.42);
-      ctx.closePath();
-      ctx.fillStyle = palette.body;
-      ctx.fill();
-      ctx.strokeStyle = palette.ink;
-      ctx.lineWidth = 1.1;
-      ctx.stroke();
-      /* cockpit */
-      ctx.beginPath();
-      ctx.ellipse(0, -h * 0.12, w * 0.1, h * 0.13, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-      ctx.fill();
-      /* damage bar for the big plane */
+      ctx.restore();
+      /* Only the big plane carries a thin health bar, as in the original. */
       if (enemy.type === 'heavy' && enemy.maxHp > 0 && enemy.hp < enemy.maxHp) {
         const ratio = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
-        const barW = w * 0.86;
-        const barY = -h * 0.72;
-        ctx.fillStyle = 'rgba(8, 12, 20, 0.75)';
-        ctx.fillRect(-barW / 2, barY, barW, 3.2);
-        ctx.fillStyle = ratio > 0.5 ? '#7be0ad' : ratio > 0.25 ? '#ffd76a' : '#ff6b6b';
-        ctx.fillRect(-barW / 2 + 0.5, barY + 0.5, (barW - 1) * ratio, 2.2);
+        const barW = enemy.width * 0.9;
+        const barX = enemy.x - barW / 2;
+        const barY = enemy.y - enemy.height / 2 - 5;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.fillRect(barX, barY, barW, 2.4);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(barX, barY, barW * ratio, 2.4);
       }
-      ctx.restore();
     }
 
-    /** Paint the player plane: engine flame, wings, fuselage, cockpit and invuln blink. */
+    /** Paint the player plane as a flat white silhouette with an invulnerability blink. */
     function drawPlayerPlane(ctx, player, elapsed) {
       const halfW = player.width / 2;
       const halfH = player.height / 2;
       const blink = player.invuln > 0 && Math.floor((elapsed || 0) * 14) % 2 === 0;
-      const flicker = 0.72 + 0.28 * Math.sin((elapsed || 0) * 32);
       ctx.save();
       ctx.translate(player.x, player.y);
       ctx.globalAlpha = blink ? 0.35 : 1;
-      /* flame */
-      ctx.beginPath();
-      ctx.moveTo(-halfW * 0.22, halfH * 0.8);
-      ctx.lineTo(0, halfH * 0.8 + halfH * 0.58 * flicker);
-      ctx.lineTo(halfW * 0.22, halfH * 0.8);
-      ctx.closePath();
-      ctx.fillStyle = '#ff9a4d';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(-halfW * 0.1, halfH * 0.8);
-      ctx.lineTo(0, halfH * 0.8 + halfH * 0.32 * flicker);
-      ctx.lineTo(halfW * 0.1, halfH * 0.8);
-      ctx.closePath();
-      ctx.fillStyle = '#ffe9b0';
-      ctx.fill();
-      /* wings */
-      ctx.beginPath();
-      ctx.moveTo(0, -halfH * 0.15);
-      ctx.lineTo(halfW, halfH * 0.44);
-      ctx.lineTo(halfW * 0.42, halfH * 0.56);
-      ctx.lineTo(0, halfH * 0.32);
-      ctx.lineTo(-halfW * 0.42, halfH * 0.56);
-      ctx.lineTo(-halfW, halfH * 0.44);
-      ctx.closePath();
-      ctx.fillStyle = '#a9bcdd';
-      ctx.fill();
-      /* fuselage */
       ctx.beginPath();
       ctx.moveTo(0, -halfH);
-      ctx.quadraticCurveTo(halfW * 0.55, -halfH * 0.1, halfW * 0.32, halfH * 0.62);
-      ctx.lineTo(-halfW * 0.32, halfH * 0.62);
-      ctx.quadraticCurveTo(-halfW * 0.55, -halfH * 0.1, 0, -halfH);
+      ctx.lineTo(halfW * 0.2, -halfH * 0.2);
+      ctx.lineTo(halfW, halfH * 0.3);
+      ctx.lineTo(halfW * 0.22, halfH * 0.32);
+      ctx.lineTo(halfW * 0.28, halfH * 0.8);
+      ctx.lineTo(0, halfH * 0.52);
+      ctx.lineTo(-halfW * 0.28, halfH * 0.8);
+      ctx.lineTo(-halfW * 0.22, halfH * 0.32);
+      ctx.lineTo(-halfW, halfH * 0.3);
+      ctx.lineTo(-halfW * 0.2, -halfH * 0.2);
       ctx.closePath();
-      ctx.fillStyle = '#eef4ff';
+      ctx.fillStyle = '#f5f7fa';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(24, 36, 58, 0.55)';
-      ctx.lineWidth = 1.1;
-      ctx.stroke();
-      /* cockpit */
       ctx.beginPath();
-      ctx.ellipse(0, -halfH * 0.3, halfW * 0.24, halfH * 0.27, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#4da3ff';
+      ctx.arc(0, -halfH * 0.22, Math.max(1.4, halfW * 0.16), 0, Math.PI * 2);
+      ctx.fillStyle = '#5aa9ff';
       ctx.fill();
       ctx.restore();
     }
 
-    /** Paint one arcade frame into the canvas (`view` comes from the resize pass). */
+    /**
+     * Paint one arcade frame: a flat dark field, sparse stars, plain white bullets
+     * and flat plane silhouettes. No glow, gradients, tilt or screen shake — the
+     * minimal look of the WeChat original.
+     */
     function drawPlaneFrame(ctx, state, view) {
       if (!ctx || !view) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, view.pxW, view.pxH);
-      ctx.fillStyle = view.gradient;
+      ctx.fillStyle = '#0d1a2b';
       ctx.fillRect(0, 0, view.pxW, view.pxH);
-      const shake = state.shake || 0;
-      const offsetX = shake > 0 ? (Math.random() * 2 - 1) * shake * 5 : 0;
-      const offsetY = shake > 0 ? (Math.random() * 2 - 1) * shake * 4 : 0;
-      ctx.setTransform(view.paintScale, 0, 0, view.paintScale, offsetX * view.paintScale, offsetY * view.paintScale);
+      ctx.setTransform(view.paintScale, 0, 0, view.paintScale, 0, 0);
 
-      /* background stars */
-      ctx.fillStyle = 'rgba(214, 229, 255, 0.85)';
+      /* sparse background stars */
+      ctx.fillStyle = 'rgba(220, 232, 255, 0.6)';
       for (let i = 0; i < state.stars.length; i += 1) {
         const star = state.stars[i];
-        ctx.globalAlpha = 0.2 + Math.min(1, star.size / 2) * 0.55;
-        ctx.fillRect(star.x, star.y, star.size, star.size * 2.2);
+        ctx.globalAlpha = 0.18 + Math.min(1, star.size / 2) * 0.3;
+        ctx.fillRect(star.x, star.y, star.size, star.size);
       }
       ctx.globalAlpha = 1;
 
-      /* bullets */
+      /* bullets: small white tracers */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
       for (let i = 0; i < state.bullets.length; i += 1) {
         const bullet = state.bullets[i];
-        ctx.fillStyle = 'rgba(90, 214, 255, 0.26)';
-        ctx.beginPath();
-        ctx.ellipse(bullet.x, bullet.y, bullet.width * 1.6, bullet.height * 0.62, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#c9f6ff';
-        ctx.beginPath();
-        ctx.ellipse(bullet.x, bullet.y, bullet.width * 0.55, bullet.height * 0.5, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(bullet.x - bullet.width / 2, bullet.y - bullet.height / 2, bullet.width, bullet.height);
       }
 
       /* enemies */
       for (let i = 0; i < state.enemies.length; i += 1) drawEnemyPlane(ctx, state.enemies[i]);
 
-      /* particles */
+      /* particles: plain dots that fade out */
       for (let i = 0; i < state.particles.length; i += 1) {
         const particle = state.particles[i];
         const alpha = Math.max(0, Math.min(1, particle.life / particle.maxLife));
         ctx.globalAlpha = alpha;
         ctx.fillStyle = PLANE_PARTICLE_COLORS[particle.tone] || PLANE_PARTICLE_COLORS[0];
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size * (0.45 + alpha), 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, particle.size * (0.4 + alpha * 0.6), 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -2963,11 +2922,7 @@ window.__ModuleLoader__.load({
           const pxH = Math.max(1, Math.round(cssH * dpr));
           if (canvas.width !== pxW) canvas.width = pxW;
           if (canvas.height !== pxH) canvas.height = pxH;
-          const gradient = ctx.createLinearGradient(0, 0, 0, pxH);
-          gradient.addColorStop(0, '#0a1120');
-          gradient.addColorStop(0.55, '#111e38');
-          gradient.addColorStop(1, '#0a1322');
-          viewRef.current = { pxW, pxH, paintScale: pxW / PLANE_WORLD.width, cssPerUnit: cssW / PLANE_WORLD.width, gradient };
+          viewRef.current = { pxW, pxH, paintScale: pxW / PLANE_WORLD.width, cssPerUnit: cssW / PLANE_WORLD.width };
         };
         resize();
         resizeRef.current = resize;
