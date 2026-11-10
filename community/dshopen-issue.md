@@ -1,6 +1,6 @@
 # dshopen.org 收录申请
 
-已提交：<ISSUE_URL>
+已提交：https://github.com/polang233/dsh-plugin-index/issues/413
 
 ## 标题
 
@@ -15,7 +15,7 @@ Git 来源（暂未发布 npm）：
 ```text
 仓库：https://github.com/feiniao1933/dsh-minigames
 版本：1.0.0
-提交：<COMMIT_SHA>
+提交：fd0f69cc53d49a652a78da3a16e4a4adcc174931
 路径：仓库根目录
 ```
 
@@ -43,6 +43,6 @@ Adds a "mini games box" tab to the DSH Web right sidebar with a built-in Gomoku 
 Logo：包内 icon.svg（也通过 ./icon 导出）
 测试版本：DSH 0.2.2-rc.1，macOS，Web 客户端
 许可证：MIT（仓库内有 LICENSE）
-安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#<COMMIT_SHA>'
+安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#fd0f69cc53d49a652a78da3a16e4a4adcc174931'
 安全：纯 Client 插件，无 webServer 路由、无网络请求、无凭据读写；只写入 3 个 localStorage 偏好键（战绩 / 难度 / 音效）。
 ```
