@@ -4,7 +4,7 @@
 
 - **Open Plugin Market（dshopen.org）**：已提交收录申请（Git 固定提交来源），等待维护者审查
   - Issue：https://github.com/polang233/dsh-plugin-index/issues/413
-  - 版本 1.1.0（新增打飞机），固定提交 `b8c0c8999f2ccbbb4251d01a37161dc72f209dfb`
+  - 版本 1.1.1（打飞机极简风格 + 修复结束抖动/遮挡），固定提交 `026771b58b5fe135eeab8fd4f3082743202ad92d`
 - **awesome-dsh-plugin（dsh-market 目录）**：已提交单文件 PR，等待 CI / 维护者
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
   - 条目：`data/plugins/feiniao1933__dsh-minigames.yml`（category `ui`）
@@ -13,7 +13,7 @@
 ## 已完成
 
 - 公开源码仓库：https://github.com/feiniao1933/dsh-minigames
-- 发布用包：`dsh-minigames@1.1.0`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
+- 发布用包：`dsh-minigames@1.1.1`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
 - `client.js` 构建产物入库；`npm pack` 校验通过
 - 引擎测试 156 断言、UI 冒烟测试通过
 - 当前 profile 已安装并验证（右面板标签、输入框工具栏入口、庆祝层均 active）
@@ -28,6 +28,7 @@
 - [x] awesome-dsh-plugin 单文件 PR
 - [x] 1.1.0：新增微信经典「打飞机」小游戏 + 游戏架切换
 - [ ] 等 awesome CI 的仓库年龄 gate（仓库 2026-11-10 创建，约 24h 后可复跑）
+- [x] 1.1.1：打飞机改为微信极简画风，修复结束画面抖动与游戏画面遮挡
 - [ ] 补充打飞机与获胜庆祝的截图
 - [x] 真实使用截图：`screenshots/game-page.png`（通过 `screenshots.json` 声明），并在 dshopen Issue 评论中提供链接
 - [ ] 补充获胜庆祝动画截图
