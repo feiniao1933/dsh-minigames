@@ -45,6 +45,7 @@ globalThis.window = {
     return {
       getItem: (key) => (store.has(key) ? store.get(key) : null),
       setItem: (key, value) => store.set(key, String(value)),
+      removeItem: (key) => store.delete(key),
     };
   })(),
   matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
@@ -308,6 +309,52 @@ assert.equal(emergencyMove(nearlyFull), 0, 'fallback AI move finds the last lega
 const fullBoard = createGame().board;
 fullBoard.fill(1);
 assert.equal(emergencyMove(fullBoard), -1, 'fallback AI move reports no point on a full board');
+
+/* ------------------------------------------------ Gomoku progress memory */
+{
+  const memory = moduleExports.__test;
+  assert.equal(memory.readGomokuGame().history.length, 0, 'a first visit starts from an empty board');
+
+  let inProgress = memory.createGame();
+  inProgress = memory.applyMove(inProgress, 112, 1);
+  inProgress = memory.applyMove(inProgress, 100, 2);
+  memory.writeGomokuSave(inProgress);
+  const restored = memory.readGomokuGame();
+  assert.deepEqual(restored.history, [112, 100], 'the move list is remembered');
+  assert.equal(restored.phase, 'playing');
+  assert.equal(restored.turn, 1, 'the restored game is the human turn');
+  assert.equal(restored.board[112], 1, 'black stone restored');
+  assert.equal(restored.board[100], 2, 'white stone restored');
+  assert.equal(restored.lastMove, 100, 'last move marker restored');
+
+  let finished = memory.createGame();
+  const script = [
+    [0, 1],
+    [30, 2],
+    [1, 1],
+    [31, 2],
+    [2, 1],
+    [32, 2],
+    [3, 1],
+    [33, 2],
+    [4, 1],
+  ];
+  for (const [index, player] of script) finished = memory.applyMove(finished, index, player);
+  assert.equal(finished.phase, 'won');
+  memory.writeGomokuSave(finished);
+  const restoredWin = memory.readGomokuGame();
+  assert.equal(restoredWin.phase, 'won', 'a finished game is restored as finished');
+  assert.ok(Array.isArray(restoredWin.winLine) && restoredWin.winLine.length >= 5, 'winning line restored');
+
+  memory.writeGomokuSave(memory.createGame());
+  assert.equal(window.localStorage.getItem(memory.GOMOKU_SAVE_KEY), null, 'a clean board clears the save');
+
+  window.localStorage.setItem(memory.GOMOKU_SAVE_KEY, JSON.stringify({ v: 1, history: [5, 5, 6] }));
+  assert.equal(memory.readGomokuGame().history.length, 0, 'an occupied square in the save falls back to a fresh board');
+  window.localStorage.setItem(memory.GOMOKU_SAVE_KEY, 'not-json');
+  assert.equal(memory.readGomokuGame().history.length, 0, 'broken JSON falls back to a fresh board');
+  window.localStorage.removeItem(memory.GOMOKU_SAVE_KEY);
+}
 let game = createGame();
 assert.equal(game.phase, 'playing');
 assert.equal(game.turn, 1);

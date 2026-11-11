@@ -75,6 +75,10 @@ panes with the sidebar's own controls, and it stays mounted while hidden.
 - **重新开始 / New game** starts over, **悔棋 / Undo** takes back your last move
   and the AI reply. The difficulty switch applies from the AI's next move and
   keeps the current board.
+- **Progress is remembered:** the board, move history, result and elapsed time
+  are saved to `localStorage` after every move, so closing the tab or reloading
+  the page resumes the same game (a finished game reopens on its result, and a
+  restart clears the save). A malformed save falls back to a fresh board.
 - The win/loss/draw tally is kept per browser in `localStorage`.
 - Winning shows the victory layer: falling confetti, three firework bursts, a
   rotating golden halo, the trophy card with move/time stats, and **Play again**.
@@ -135,9 +139,9 @@ ctx.slots.register({ name: 'shell.overlay', id: 'dsh-minigames-celebration' }, C
 
 - DSH `0.2.2-rc.1`, macOS, Web client (`dsh web`).
 - Gomoku engine: 156 assertions; sky shooter: 6400+ checks plus 31 enemy-fire
-  checks; UI smoke test:
-  registration + server-rendered page + celebration + win/lose/draw/undo state
-  machine + arcade step/pause/input through the built bundle.
+  checks; UI smoke test: registration + server-rendered page + celebration +
+  win/lose/draw/undo state machine + arcade step/pause/input through the built
+  bundle + Gomoku save/restore round-trips and corrupt-save fallbacks.
 
 ## Privacy
 
@@ -149,6 +153,8 @@ these browser-local preferences in `localStorage`:
 - `dsh.minigames.sound.v1` – sound on/off
 - `dsh.minigames.game.v1` – last selected game
 - `dsh.minigames.plane.best.v1` – sky-shooter best score
+- `dsh.minigames.gomoku.save.v1` – Gomoku move list, result and elapsed time
+  (removed when a fresh board is started)
 
 ## License
 

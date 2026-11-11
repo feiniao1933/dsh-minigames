@@ -1427,6 +1427,7 @@ window.__ModuleLoader__.load({
     const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
     const GAME_ORDER = ['gomoku', 'plane'];
     const GAME_KEY = 'dsh.minigames.game.v1';
+    const GOMOKU_SAVE_KEY = 'dsh.minigames.gomoku.save.v1';
     const PLANE_BEST_KEY = 'dsh.minigames.plane.best.v1';
     const DEFAULT_DIFFICULTY = 'hard';
     const DIFFICULTY_KEY = 'dsh.minigames.difficulty.v1';
@@ -2329,6 +2330,64 @@ window.__ModuleLoader__.load({
     function elapsedSeconds(state) {
       if (!state.startedAt) return 0;
       return ((state.endedAt || Date.now()) - state.startedAt) / 1000;
+    }
+
+    /**
+     * Persist an in-progress or finished Gomoku game. The move list is enough to
+     * rebuild the whole position, so only the history, phase and elapsed time are
+     * stored.
+     */
+    function writeGomokuSave(state) {
+      try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        if (state.history.length === 0 && state.phase === 'playing') {
+          window.localStorage.removeItem(GOMOKU_SAVE_KEY);
+          return;
+        }
+        const finished = state.phase !== 'playing';
+        const startedAt = state.startedAt || Date.now();
+        const elapsedMs = Math.max(0, (finished && state.endedAt ? state.endedAt : Date.now()) - startedAt);
+        window.localStorage.setItem(
+          GOMOKU_SAVE_KEY,
+          JSON.stringify({ v: 1, history: state.history, phase: state.phase, elapsedMs }),
+        );
+      } catch {
+        /* storage disabled or full: the game keeps working without memory */
+      }
+    }
+
+    /** Replay one saved move list through the game rules; null when the save is malformed. */
+    function replayGomokuSave(saved) {
+      if (!saved || saved.v !== 1 || !Array.isArray(saved.history)) return null;
+      const history = saved.history;
+      if (history.length === 0 || history.length > BOARD_SIZE * BOARD_SIZE) return null;
+      let game = createGame();
+      const seen = new Set();
+      for (let i = 0; i < history.length; i += 1) {
+        const index = history[i];
+        if (!Number.isInteger(index) || index < 0 || index >= BOARD_SIZE * BOARD_SIZE) return null;
+        if (seen.has(index)) return null;
+        if (game.phase !== 'playing') return null;
+        seen.add(index);
+        game = applyMove(game, index, i % 2 === 0 ? HUMAN : AI);
+      }
+      if (game.history.length !== history.length) return null;
+      const elapsed = Number(saved.elapsedMs);
+      const elapsedMs = Number.isFinite(elapsed) && elapsed > 0 ? elapsed : 0;
+      const endedAt = game.phase === 'playing' ? 0 : Date.now();
+      return { ...game, startedAt: Date.now() - elapsedMs, endedAt };
+    }
+
+    /** Restore the saved Gomoku game, falling back to a fresh board on any bad state. */
+    function readGomokuGame() {
+      try {
+        if (typeof window === 'undefined' || !window.localStorage) return createGame();
+        const raw = window.localStorage.getItem(GOMOKU_SAVE_KEY);
+        if (!raw) return createGame();
+        return replayGomokuSave(JSON.parse(raw)) || createGame();
+      } catch {
+        return createGame();
+      }
     }
 
     /** The two endpoints of a winning line, sorted left-to-right / top-to-bottom. */
@@ -3393,7 +3452,7 @@ window.__ModuleLoader__.load({
       const tabInfo = typeof props.useTabInfo === 'function' ? props.useTabInfo() : null;
       const tabVisible = tabInfo === null ? true : tabInfo.tab.visible !== false;
       const tabVisibleRef = React.useRef(tabVisible);
-      const [state, setState] = React.useState(createGame);
+      const [state, setState] = React.useState(readGomokuGame);
       const [record, setRecord] = React.useState(readRecord);
       const [difficulty, setDifficulty] = React.useState(readDifficulty);
       const [soundOn, setSoundOn] = React.useState(readSound);
@@ -3405,7 +3464,7 @@ window.__ModuleLoader__.load({
       const [cursor, setCursor] = React.useState(112);
       const [keyboardMode, setKeyboardMode] = React.useState(false);
       const aliveRef = React.useRef(true);
-      const recordedRef = React.useRef('');
+      const recordedRef = React.useRef(state.phase === 'playing' ? '' : `${state.id}:${state.phase}`);
 
       React.useEffect(() => {
         aliveRef.current = true;
@@ -3418,6 +3477,11 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         writeRecord(record);
       }, [record]);
+
+      /* Keep the board, move history and result across page reloads and tab closes. */
+      React.useEffect(() => {
+        writeGomokuSave(state);
+      }, [state]);
 
       React.useEffect(() => {
         soundRef.current = soundOn;
@@ -3903,6 +3967,10 @@ window.__ModuleLoader__.load({
       undoMove,
       elapsedSeconds,
       emergencyMove,
+      readGomokuGame,
+      writeGomokuSave,
+      replayGomokuSave,
+      GOMOKU_SAVE_KEY,
       tabDefinition,
       createLauncher,
       DIFFICULTIES,
