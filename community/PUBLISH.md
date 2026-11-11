@@ -6,7 +6,7 @@
   - 插件页：https://dshopen.org/zh/plugins/dsh-minigames/
   - 收录 Issue（已关闭）：https://github.com/polang233/dsh-plugin-index/issues/413
   - 1.2.0 / 1.3.0 的版本升级已按规则回复在原 Issue，等待维护者复核升版
-  - 版本 1.4.0（新增鲸鱼 Flappy + 图标放大），固定提交 `ae005e15fbd04b724f14e49acb02d83f275012ef`
+  - 版本 1.4.1（游戏画面加宽），固定提交 `7ee79d2241af6582772de7c6886a97a191d7aa4a`
 - **awesome-dsh-plugin（dsh-market 目录）**：PR 已提交，仓库年龄 gate 即将满足（2026-11-11 14:48 UTC 满 24h）
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
   - 条目：`data/plugins/feiniao1933__dsh-minigames.yml`（category `ui`）
@@ -15,7 +15,7 @@
 ## 已完成
 
 - 公开源码仓库：https://github.com/feiniao1933/dsh-minigames
-- 发布用包：`dsh-minigames@1.4.0`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
+- 发布用包：`dsh-minigames@1.4.1`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
 - `client.js` 构建产物入库；`npm pack` 校验通过
 - 引擎测试 156 断言、UI 冒烟测试通过
 - 当前 profile 已安装并验证（右面板标签、输入框工具栏入口、庆祝层均 active）
@@ -35,6 +35,7 @@
 - [x] 1.2.1：更换游戏盒子图标（白色手柄 + 深蓝底），标签页/开始页/工具栏同步
 - [x] 1.3.0：五子棋进度记忆（刷新/重开后自动恢复棋局、胜负与耗时）
 - [x] 1.4.0：新增第三个游戏「鲸鱼飞飞」（海底 Flappy Bird，鲸鱼形象，鼠标/键盘控制），图标放大
+- [x] 1.4.1：打飞机与鲸鱼飞飞画面加宽（360×600 → 540×600），填满侧栏宽度
 - [ ] 补充打飞机与获胜庆祝的截图
 - [x] 真实使用截图：`screenshots/game-page.png`（通过 `screenshots.json` 声明），并在 dshopen Issue 评论中提供链接
 - [ ] 补充获胜庆祝动画截图
