@@ -188,9 +188,9 @@ assert.ok(html.includes('关闭音效'), 'sound toggle is on by default');
 
 /* Second game: WeChat-style sky shooter */
 assert.equal((html.match(/class="mgCard"/g) ?? []).length, 3, 'three playable games in the shelf');
-assert.ok(html.includes('打飞机'), 'sky shooter card renders');
+assert.ok(html.includes('飞机大战'), 'sky battle card renders');
 assert.ok(html.includes('经典复刻'), 'sky shooter card describes itself');
-assert.ok(html.includes('鲸鱼飞飞'), 'flappy whale card renders');
+assert.ok(html.includes('鲸鱼飞跃'), 'whale leap card renders');
 assert.ok(html.includes('海底飞行'), 'flappy whale card describes itself');
 assert.ok(html.includes('mgMore'), 'the "more games" placeholder renders');
 assert.ok(html.includes('mgPanePlane'), 'the arcade pane is mounted');

@@ -9,9 +9,9 @@ A mini-games box for the DSH Web right sidebar. It ships two games:
 
 - **Gomoku (五子棋)** against the built-in AI in three difficulties; winning
   triggers a frame-wide celebration with confetti, fireworks and a trophy card.
-- **Sky shooter (打飞机)** — a WeChat-style arcade shooter: drag your plane,
+- **Sky battle (飞机大战)** — a WeChat-style arcade shooter: drag your plane,
   dodge the descending enemies, auto-fire, chase a personal best.
-- **Flappy whale (鲸鱼飞飞)** — an underwater Flappy-Bird style game where the
+- **Whale leap (鲸鱼飞跃)** — an underwater Flappy-Bird style game where the
   bird is the DSH whale: click or press Space to swim up through coral gaps.
 
 ## Install
@@ -41,7 +41,7 @@ controls.
 
 ![The mini games box in the DSH right sidebar](screenshots/game-page.png)
 
-Captures of the sky shooter and the victory celebration are still to come.
+Captures of the two arcade games and the victory celebration are still to come.
 The repository ships no mock-up images.
 
 ## Where it lives
@@ -61,7 +61,7 @@ Two ways in, both backed by the same tab type:
   strip reopens the Start page.
 
 The game opens as a tab in the right sidebar: a game shelf at the top (五子棋 /
-打飞机 / 鲸鱼飞飞), the selected game below it, and "more games" placeholder row.
+飞机大战 / 鲸鱼飞跃), the selected game below it, and "more games" placeholder row.
 Switching games keeps every game's state while the tab stays open.
 
 Because it is a regular tab type, it can be split, floated or moved between
@@ -97,7 +97,7 @@ dictionaries); every non-artwork colour is a `--dsw-alias-*` theme token, so the
 page follows light/dark themes. The board wood, stones, trophy and confetti
 palette are artwork colours.
 
-## Sky shooter
+## Sky battle (飞机大战)
 
 A compact remake of the classic WeChat airplane game, rendered on a `<canvas>`
 inside the same right-sidebar page.
@@ -117,7 +117,7 @@ inside the same right-sidebar page.
   resume or restart from there. Mute silences arcade sound effects (including
   the enemy-fire blip) too.
 
-## Flappy whale
+## Whale leap (鲸鱼飞跃)
 
 An underwater Flappy-Bird remake where the bird is the DSH whale.
 
@@ -141,7 +141,7 @@ An underwater Flappy-Bird remake where the bird is the DSH whale.
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
 | `src/plane.js` | Pure sky-shooter simulation: fixed 540×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
 | `src/flappy.js` | Pure flappy-whale simulation: fixed 540×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
-| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas games (sky shooter incl. enemy bullets, underwater flappy whale), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
+| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas games (sky battle incl. enemy bullets, underwater whale leap), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
 | `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/flappy.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
 | `locale/*.json` | Plugin title/description shown by Plugin Manager and Settings (8 locales). |
@@ -160,7 +160,7 @@ ctx.slots.register({ name: 'shell.overlay', id: 'dsh-minigames-celebration' }, C
 ## Tested
 
 - DSH `0.2.2-rc.1`, macOS, Web client (`dsh web`).
-- Gomoku engine: 156 assertions; sky shooter: 6400+ checks plus 31 enemy-fire
+- Gomoku engine: 156 assertions; sky battle: 6400+ checks plus 31 enemy-fire
   checks; UI smoke test: registration + server-rendered page + celebration +
   win/lose/draw/undo state machine + arcade step/pause/input through the built
   bundle + Gomoku save/restore round-trips and corrupt-save fallbacks.
@@ -177,7 +177,7 @@ these browser-local preferences in `localStorage`:
 - `dsh.minigames.plane.best.v1` – sky-shooter best score
 - `dsh.minigames.gomoku.save.v1` – Gomoku move list, result and elapsed time
   (removed when a fresh board is started)
-- `dsh.minigames.flappy.best.v1` – flappy-whale best score
+- `dsh.minigames.flappy.best.v1` – whale-leap best score
 
 ## License
 
