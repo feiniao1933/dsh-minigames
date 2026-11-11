@@ -840,14 +840,14 @@ window.__ModuleLoader__.load({
      *   - state is a plain JSON-able object (no class instances, no Infinity/NaN);
      *     ids are unique and every entity array is bounded.
      *
-     * World is fixed at 360 x 600 logical units (origin top-left, y grows down),
+     * World is fixed at 540 x 600 logical units (origin top-left, y grows down),
      * positions are box CENTRES and the simulation is frame-rate independent:
      * `stepPlane(state, dtSeconds)` internally clamps dt to <= 0.05 s.
      * The UI owns player input (movePlayerBy / setPlayerPosition), rendering,
      * audio and the HUD and consumes `state.lastEvents` after every step.
      */
 
-    const PLANE_WORLD = { width: 360, height: 600 };
+    const PLANE_WORLD = { width: 540, height: 600 };
     const PLANE_LIVES = 3;
     const PLANE_PLAYER = { width: 34, height: 42 };
 
@@ -1404,7 +1404,7 @@ window.__ModuleLoader__.load({
      *   - state is a plain JSON-able object (no class instances, no Infinity/NaN);
      *     ids are unique and every entity array is bounded.
      *
-     * World is fixed at 360 x 600 logical units (origin top-left, y grows down).
+     * World is fixed at 540 x 600 logical units (origin top-left, y grows down).
      * The whale's x is fixed, only y changes; the body of the whale is the AABB
      * `FLAPPY_BIRD`, `bird.x`/`bird.y` are the box CENTRE. Simulation is
      * frame-rate independent: `stepFlappy(state, dtSeconds)` clamps dt to <= 0.05 s.
@@ -1414,7 +1414,7 @@ window.__ModuleLoader__.load({
      * `state.lastEvents` after every step; this file never touches the outside.
      */
 
-    const FLAPPY_WORLD = { width: 360, height: 600 };
+    const FLAPPY_WORLD = { width: 540, height: 600 };
     const FLAPPY_BIRD = { width: 40, height: 28 };
 
     /**
@@ -3889,7 +3889,7 @@ window.__ModuleLoader__.load({
               'aria-label': t('game.plane'),
               onKeyDown,
             },
-            React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+            React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 540, height: 600 }),
             overlay,
           ),
         ),
@@ -4015,12 +4015,12 @@ window.__ModuleLoader__.load({
       ctx.fillStyle = 'rgba(180, 230, 255, 0.06)';
       for (let i = 0; i < 3; i += 1) {
         const drift = Math.sin(elapsed * 0.35 + i * 1.7) * 14;
-        const x = 40 + i * 110 + drift;
+        const x = W * 0.08 + i * W * 0.3 + drift;
         ctx.beginPath();
         ctx.moveTo(x, -20);
-        ctx.lineTo(x + 52, -20);
-        ctx.lineTo(x + 150, H * 0.72);
-        ctx.lineTo(x + 62, H * 0.72);
+        ctx.lineTo(x + W * 0.1, -20);
+        ctx.lineTo(x + W * 0.28, H * 0.72);
+        ctx.lineTo(x + W * 0.12, H * 0.72);
         ctx.closePath();
         ctx.fill();
       }
@@ -4079,8 +4079,8 @@ window.__ModuleLoader__.load({
       ctx.strokeStyle = '#1d7a6a';
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
-      for (let i = 0; i < 5; i += 1) {
-        const baseX = 26 + i * 66;
+      for (let i = 0; i < 6; i += 1) {
+        const baseX = W * (0.08 + i * 0.17);
         const sway = Math.sin(elapsed * 1.3 + i) * 6;
         ctx.beginPath();
         ctx.moveTo(baseX, H - 26);
@@ -4381,7 +4381,7 @@ window.__ModuleLoader__.load({
               'aria-label': t('game.flappy'),
               onKeyDown,
             },
-            React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+            React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 540, height: 600 }),
             overlay,
           ),
         ),

@@ -13,7 +13,7 @@
  *   - state is a plain JSON-able object (no class instances, no Infinity/NaN);
  *     ids are unique and every entity array is bounded.
  *
- * World is fixed at 360 x 600 logical units (origin top-left, y grows down).
+ * World is fixed at 540 x 600 logical units (origin top-left, y grows down).
  * The whale's x is fixed, only y changes; the body of the whale is the AABB
  * `FLAPPY_BIRD`, `bird.x`/`bird.y` are the box CENTRE. Simulation is
  * frame-rate independent: `stepFlappy(state, dtSeconds)` clamps dt to <= 0.05 s.
@@ -23,7 +23,7 @@
  * `state.lastEvents` after every step; this file never touches the outside.
  */
 
-export const FLAPPY_WORLD = { width: 360, height: 600 };
+export const FLAPPY_WORLD = { width: 540, height: 600 };
 export const FLAPPY_BIRD = { width: 40, height: 28 };
 
 /**

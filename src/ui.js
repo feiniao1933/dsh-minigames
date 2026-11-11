@@ -2135,7 +2135,7 @@ function PlaneGame(props) {
           'aria-label': t('game.plane'),
           onKeyDown,
         },
-        React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+        React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 540, height: 600 }),
         overlay,
       ),
     ),
@@ -2261,12 +2261,12 @@ function drawFlappyFrame(ctx, state, view) {
   ctx.fillStyle = 'rgba(180, 230, 255, 0.06)';
   for (let i = 0; i < 3; i += 1) {
     const drift = Math.sin(elapsed * 0.35 + i * 1.7) * 14;
-    const x = 40 + i * 110 + drift;
+    const x = W * 0.08 + i * W * 0.3 + drift;
     ctx.beginPath();
     ctx.moveTo(x, -20);
-    ctx.lineTo(x + 52, -20);
-    ctx.lineTo(x + 150, H * 0.72);
-    ctx.lineTo(x + 62, H * 0.72);
+    ctx.lineTo(x + W * 0.1, -20);
+    ctx.lineTo(x + W * 0.28, H * 0.72);
+    ctx.lineTo(x + W * 0.12, H * 0.72);
     ctx.closePath();
     ctx.fill();
   }
@@ -2325,8 +2325,8 @@ function drawFlappyFrame(ctx, state, view) {
   ctx.strokeStyle = '#1d7a6a';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
-  for (let i = 0; i < 5; i += 1) {
-    const baseX = 26 + i * 66;
+  for (let i = 0; i < 6; i += 1) {
+    const baseX = W * (0.08 + i * 0.17);
     const sway = Math.sin(elapsed * 1.3 + i) * 6;
     ctx.beginPath();
     ctx.moveTo(baseX, H - 26);
@@ -2627,7 +2627,7 @@ function FlappyGame(props) {
           'aria-label': t('game.flappy'),
           onKeyDown,
         },
-        React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+        React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 540, height: 600 }),
         overlay,
       ),
     ),

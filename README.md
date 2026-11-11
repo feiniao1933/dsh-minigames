@@ -139,8 +139,8 @@ An underwater Flappy-Bird remake where the bird is the DSH whale.
 | `cordis.patch.yml` | Inserts one Host entry (`minigames-box`). |
 | `index.js` | Host half; no Host behaviour, the Client module owns the rendering. |
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
-| `src/plane.js` | Pure sky-shooter simulation: fixed 360×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
-| `src/flappy.js` | Pure flappy-whale simulation: fixed 360×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
+| `src/plane.js` | Pure sky-shooter simulation: fixed 540×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
+| `src/flappy.js` | Pure flappy-whale simulation: fixed 540×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
 | `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas games (sky shooter incl. enemy bullets, underwater flappy whale), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
 | `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/flappy.js` + `src/ui.js` into `client.js` inside one module-loader factory. |

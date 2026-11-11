@@ -191,7 +191,7 @@ run('create / start / reset', () => {
   checkEqual(state.phase, 'idle', 'create: phase is idle');
   checkEqual(state.width, PLANE_WORLD.width, 'create: world width');
   checkEqual(state.height, PLANE_WORLD.height, 'create: world height');
-  checkEqual(state.player.x, 180, 'create: player x centred');
+  checkEqual(state.player.x, PLANE_WORLD.width / 2, 'create: player x centred');
   checkEqual(state.player.y, 520, 'create: player y');
   checkEqual(state.player.width, PLANE_PLAYER.width, 'create: player width');
   checkEqual(state.player.height, PLANE_PLAYER.height, 'create: player height');

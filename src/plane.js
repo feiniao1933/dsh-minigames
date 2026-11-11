@@ -13,14 +13,14 @@
  *   - state is a plain JSON-able object (no class instances, no Infinity/NaN);
  *     ids are unique and every entity array is bounded.
  *
- * World is fixed at 360 x 600 logical units (origin top-left, y grows down),
+ * World is fixed at 540 x 600 logical units (origin top-left, y grows down),
  * positions are box CENTRES and the simulation is frame-rate independent:
  * `stepPlane(state, dtSeconds)` internally clamps dt to <= 0.05 s.
  * The UI owns player input (movePlayerBy / setPlayerPosition), rendering,
  * audio and the HUD and consumes `state.lastEvents` after every step.
  */
 
-export const PLANE_WORLD = { width: 360, height: 600 };
+export const PLANE_WORLD = { width: 540, height: 600 };
 export const PLANE_LIVES = 3;
 export const PLANE_PLAYER = { width: 34, height: 42 };
 
