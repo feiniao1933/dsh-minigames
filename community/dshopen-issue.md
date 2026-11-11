@@ -14,8 +14,8 @@ Git 来源（暂未发布 npm）：
 
 ```text
 仓库：https://github.com/feiniao1933/dsh-minigames
-版本：1.1.1
-提交：026771b58b5fe135eeab8fd4f3082743202ad92d
+版本：1.2.0
+提交：4514f88c4cc270a599ab976e3e4431a92161a92b
 路径：仓库根目录
 ```
 
@@ -30,7 +30,7 @@ Git 来源（暂未发布 npm）：
 English:
 
 ```text
-Adds a "mini games box" tab to the DSH Web right sidebar with two built-in games: a Gomoku match at easy / normal / hard AI with undo, restart and a local tally plus a frame-wide confetti/fireworks/trophy celebration on a win; and a WeChat-style sky-shooter remake (drag or arrow keys, auto-fire, three lives, several enemy types, particle explosions, local best score). Placement and arcade sounds are synthesized with Web Audio and can be muted. The page mirrors the right sidebar's Start-page layout and opens from a small board button in the composer toolbar or the Start-page capsule; colours use the host theme tokens and copy follows the interface language.
+Adds a "mini games box" tab to the DSH Web right sidebar with two built-in games: a Gomoku match at easy / normal / hard AI with undo, restart and a local tally plus a frame-wide confetti/fireworks/trophy celebration on a win; and a WeChat-style sky-shooter remake (drag or arrow keys, auto-fire, three lives, several enemy types — fighters and heavy bombers shoot back — particle explosions, local best score). Placement and arcade sounds are synthesized with Web Audio and can be muted. The page mirrors the right sidebar's Start-page layout and opens from a small board button in the composer toolbar or the Start-page capsule; colours use the host theme tokens and copy follows the interface language.
 ```
 
 ## 截图 / Screenshots
@@ -43,6 +43,6 @@ Adds a "mini games box" tab to the DSH Web right sidebar with two built-in games
 Logo：包内 icon.svg（也通过 ./icon 导出）
 测试版本：DSH 0.2.2-rc.1，macOS，Web 客户端
 许可证：MIT（仓库内有 LICENSE）
-安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#026771b58b5fe135eeab8fd4f3082743202ad92d'
+安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#4514f88c4cc270a599ab976e3e4431a92161a92b'
 安全：纯 Client 插件，无 webServer 路由、无网络请求、无凭据读写；只写入 3 个 localStorage 偏好键（战绩 / 难度 / 音效）。
 ```
