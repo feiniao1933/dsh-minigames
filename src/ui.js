@@ -71,8 +71,8 @@ const DICT = {
     'plane.pausedTitle': 'Paused',
     'plane.overTitle': 'Game over',
     'plane.newBest': 'New best!',
-    'plane.tipIdle': 'Drag the plane to dodge enemies. It fires automatically.',
-    'plane.hint': 'Drag to move · auto-fire · 3 lives',
+    'plane.tipIdle': 'Drag the plane to dodge enemies and their fire. It fires automatically.',
+    'plane.hint': 'Drag to move · auto-fire · dodge enemy bullets',
     'plane.final': 'Score {score} · Best {best}',
     'status.yourTurn': 'Your move',
     'status.aiThinking': 'AI is thinking…',
@@ -129,8 +129,8 @@ const DICT = {
     'plane.pausedTitle': '已暂停',
     'plane.overTitle': '游戏结束',
     'plane.newBest': '新纪录！',
-    'plane.tipIdle': '拖动飞机躲避敌机，子弹自动发射。',
-    'plane.hint': '拖动移动 · 自动开火 · 三条命',
+    'plane.tipIdle': '拖动飞机躲避敌机与弹幕，子弹自动发射。',
+    'plane.hint': '拖动移动 · 自动开火 · 躲避敌机弹幕',
     'plane.final': '本局 {score} 分 · 最高 {best} 分',
     'status.yourTurn': '轮到你落子',
     'status.aiThinking': 'AI 正在思考…',
@@ -821,6 +821,32 @@ function playDamageSound(enabled) {
   gain.connect(context.destination);
   osc.start(start);
   osc.stop(start + 0.32);
+}
+
+/** Rate limiter so a wave of enemy fire does not turn into a drone. */
+let lastEnemyShotSoundAt = 0;
+
+/** A quiet low blip when an enemy opens fire. */
+function playEnemyShotSound(enabled) {
+  if (!enabled) return;
+  const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+  if (now - lastEnemyShotSoundAt < 220) return;
+  lastEnemyShotSoundAt = now;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const start = context.currentTime;
+  const osc = context.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(360, start);
+  osc.frequency.exponentialRampToValueAtTime(190, start + 0.08);
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.03, start + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+  osc.connect(gain);
+  gain.connect(context.destination);
+  osc.start(start);
+  osc.stop(start + 0.12);
 }
 
 /** Release the audio context when the plugin unloads. */
@@ -1550,6 +1576,16 @@ function drawPlaneFrame(ctx, state, view) {
     ctx.fillRect(bullet.x - bullet.width / 2, bullet.y - bullet.height / 2, bullet.width, bullet.height);
   }
 
+  /* enemy bullets: warm dots, clearly different from the white tracers */
+  const enemyBullets = state.enemyBullets || [];
+  ctx.fillStyle = '#ffb347';
+  for (let i = 0; i < enemyBullets.length; i += 1) {
+    const enemyBullet = enemyBullets[i];
+    ctx.beginPath();
+    ctx.arc(enemyBullet.x, enemyBullet.y, Math.max(2, enemyBullet.width * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   /* enemies */
   for (let i = 0; i < state.enemies.length; i += 1) drawEnemyPlane(ctx, state.enemies[i]);
 
@@ -1682,6 +1718,7 @@ function PlaneGame(props) {
           for (let i = 0; i < state.lastEvents.length; i += 1) {
             const event = state.lastEvents[i];
             if (event.type === 'shot') playShotSound(soundOnRef.current);
+            else if (event.type === 'enemy-shot') playEnemyShotSound(soundOnRef.current);
             else if (event.type === 'explode') playExplosionSound(soundOnRef.current, event.size || 1);
             else if (event.type === 'damage') playDamageSound(soundOnRef.current);
           }

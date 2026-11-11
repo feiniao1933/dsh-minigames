@@ -95,11 +95,16 @@ inside the same right-sidebar page.
   too); bullets fire automatically.
 - Enemies descend in waves — small scouts, drifting fighters and slow heavy
   bombers with a health bar. Shooting one scores 10 / 35 / 120 points.
-- You have **3 lives**; a collision costs one and grants brief invulnerability,
-  with screen shake. At zero lives the run ends and the **best score** is kept
-  in `localStorage`.
+- **Enemies shoot back:** fighters fire a single aimed bullet every ~1.5–2.4 s;
+  heavies fire a three-way spread every ~2–3 s. Their reload shortens as the run
+  goes on. Dodge the warm-orange dots — the player hitbox against bullets is
+  deliberately smaller than the plane.
+- You have **3 lives**; a collision or an enemy bullet costs one and grants
+  brief invulnerability. At zero lives the run ends and the **best score** is
+  kept in `localStorage`.
 - A short pause overlay appears when you switch games or the tab is hidden;
-  resume or restart from there. Mute silences the arcade sound effects too.
+  resume or restart from there. Mute silences arcade sound effects (including
+  the enemy-fire blip) too.
 
 ## Implementation
 
@@ -109,8 +114,8 @@ inside the same right-sidebar page.
 | `cordis.patch.yml` | Inserts one Host entry (`minigames-box`). |
 | `index.js` | Host half; no Host behaviour, the Client module owns the rendering. |
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
-| `src/plane.js` | Pure sky-shooter simulation: fixed 360×600 world, seeded RNG, auto-fire, waves and enemy types, AABB collisions, particles, lives/score, pause/over phases. |
-| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas sky shooter (render/HUD/input), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
+| `src/plane.js` | Pure sky-shooter simulation: fixed 360×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
+| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas sky shooter (render/HUD/input incl. enemy bullets), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
 | `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
 | `locale/*.json` | Plugin title/description shown by Plugin Manager and Settings (8 locales). |
@@ -129,7 +134,8 @@ ctx.slots.register({ name: 'shell.overlay', id: 'dsh-minigames-celebration' }, C
 ## Tested
 
 - DSH `0.2.2-rc.1`, macOS, Web client (`dsh web`).
-- Gomoku engine: 156 assertions; sky shooter: 6417 checks; UI smoke test:
+- Gomoku engine: 156 assertions; sky shooter: 6400+ checks plus 31 enemy-fire
+  checks; UI smoke test:
   registration + server-rendered page + celebration + win/lose/draw/undo state
   machine + arcade step/pause/input through the built bundle.
 
@@ -155,6 +161,7 @@ node build.mjs                    # rebuild client.js
 node build.mjs --test             # bundle with internals exposed, for smoke/ui.smoke.mjs
 node test/engine.test.mjs         # Gomoku engine unit + self-play tests
 node test/plane.test.mjs          # sky-shooter simulation tests
+node test/plane-enemy-bullets.test.mjs  # enemy fire, aimed shots, bullet damage
 node smoke/ui.smoke.mjs           # registration + SSR render + both games' state
 ```
 

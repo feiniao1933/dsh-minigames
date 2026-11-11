@@ -261,6 +261,33 @@ assert.equal(shooter.phase, 'running');
 const startX = shooter.player.x;
 planeSim.movePlayerBy(shooter, -30, 0);
 assert.ok(shooter.player.x < startX, 'arcade input moves the plane');
+
+/* Enemy fire through the built bundle: a fighter in the play area must shoot. */
+const shooter2 = planeSim.createPlaneState(9);
+planeSim.startPlane(shooter2, { best: 0 });
+shooter2.spawnTimer = 9999;
+shooter2.fireTimer = 9999;
+shooter2.enemies.push({
+  id: 500,
+  type: 'fighter',
+  x: 120,
+  y: 120,
+  width: 32,
+  height: 34,
+  hp: 3,
+  maxHp: 3,
+  vx: 0,
+  drift: 0,
+  phase: 0,
+  fireTimer: 0.02,
+});
+shooter2.player.x = 300;
+planeSim.stepPlane(shooter2, 0.05);
+assert.ok(Array.isArray(shooter2.enemyBullets) && shooter2.enemyBullets.length === 1, 'enemy fire runs through the bundle');
+assert.ok(shooter2.enemyBullets[0].vy > 0 && shooter2.enemyBullets[0].vx > 0, 'enemy bullet aims down at the player');
+assert.ok(shooter2.lastEvents.some((event) => event.type === 'enemy-shot'), 'enemy-shot event reaches the UI layer');
+planeSim.startPlane(shooter2, { best: 0 });
+assert.equal(shooter2.enemyBullets.length, 0, 'restart clears enemy bullets');
 assert.deepEqual(prefs.DIFFICULTY_ORDER, ['easy', 'normal', 'hard']);
 for (const id of prefs.DIFFICULTY_ORDER) {
   assert.ok(prefs.DIFFICULTIES[id].maxDepth <= 6 && prefs.DIFFICULTIES[id].timeBudgetMs <= 430);

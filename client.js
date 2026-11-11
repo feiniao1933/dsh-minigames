@@ -872,6 +872,16 @@ window.__ModuleLoader__.load({
     const mgPlaneBulletHeight = 12;
     const mgPlaneGunOffset = 11;
     const mgPlaneMaxBullets = 80;
+    const mgPlaneMaxEnemyBullets = 120;
+    const mgPlaneEnemyBulletWidth = 5;
+    const mgPlaneEnemyBulletHeight = 10;
+    const mgPlaneEnemyBulletSpeed = 205;
+    const mgPlaneFighterFireMin = 1.5;
+    const mgPlaneFighterFireMax = 2.4;
+    const mgPlaneHeavyFireMin = 2;
+    const mgPlaneHeavyFireMax = 3.1;
+    const mgPlaneFireRamp = 0.0035;
+    const mgPlaneFireRampFloor = 0.6;
     const mgPlaneMaxEnemies = 40;
     const mgPlaneMaxParticles = 280;
     const mgPlaneStarCount = 70;
@@ -900,6 +910,35 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ */
     /* Small helpers                                                       */
     /* ------------------------------------------------------------------ */
+
+    /** Spawn one enemy bullet aimed by its velocity; bounded by the array cap. */
+    function mgPlaneSpawnEnemyBullet(state, x, y, vx, vy) {
+      if (state.enemyBullets.length >= mgPlaneMaxEnemyBullets) return;
+      state.enemyBullets.push({
+        id: state.nextId,
+        x,
+        y,
+        width: mgPlaneEnemyBulletWidth,
+        height: mgPlaneEnemyBulletHeight,
+        vx,
+        vy,
+      });
+      state.nextId += 1;
+    }
+
+    /** Apply one hit to the player: a life, brief invulnerability and the shake, or game over. */
+    function mgPlaneDamagePlayer(state) {
+      state.lives -= 1;
+      state.shake = 1;
+      state.player.invuln = mgPlaneInvulnTime;
+      mgPlanePushEvent(state, { type: 'damage' });
+      if (state.lives <= 0) {
+        state.lives = 0;
+        state.phase = 'over';
+        if (state.score > state.best) state.best = state.score;
+        mgPlanePushEvent(state, { type: 'over' });
+      }
+    }
 
     function mgPlaneOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
       return Math.abs(ax - bx) * 2 < aw + bw && Math.abs(ay - by) * 2 < ah + bh;
@@ -997,6 +1036,8 @@ window.__ModuleLoader__.load({
         vx = (mgPlaneRandom(state) < 0.5 ? -1 : 1) * (5 + mgPlaneRandom(state) * 9);
         drift = 7 + mgPlaneRandom(state) * 10;
       }
+      const fireWindow = type === 'fighter' ? mgPlaneFighterFireMax - mgPlaneFighterFireMin : type === 'heavy' ? mgPlaneHeavyFireMax - mgPlaneHeavyFireMin : 0;
+      const fireDelay = type === 'fighter' ? mgPlaneFighterFireMin : type === 'heavy' ? mgPlaneHeavyFireMin : 0;
       state.enemies.push({
         id: state.nextId,
         type,
@@ -1009,6 +1050,7 @@ window.__ModuleLoader__.load({
         vx,
         drift,
         phase: mgPlaneRandom(state) * Math.PI * 2,
+        fireTimer: type === 'scout' ? -1 : fireDelay + mgPlaneRandom(state) * fireWindow,
       });
       state.nextId += 1;
     }
@@ -1060,6 +1102,7 @@ window.__ModuleLoader__.load({
           invuln: 0,
         },
         bullets: [],
+        enemyBullets: [],
         enemies: [],
         particles: [],
         stars: [],
@@ -1089,6 +1132,7 @@ window.__ModuleLoader__.load({
       state.player.y = mgPlanePlayerStartY;
       state.player.invuln = 0;
       state.bullets.length = 0;
+      state.enemyBullets.length = 0;
       state.enemies.length = 0;
       state.particles.length = 0;
       state.spawnTimer = mgPlaneFirstSpawnDelay;
@@ -1186,6 +1230,46 @@ window.__ModuleLoader__.load({
         if (enemy.y - enemy.height / 2 > state.height + 4) enemies.splice(i, 1);
       }
 
+      /* enemy fire ------------------------------------------------------ */
+      const enemyBullets = state.enemyBullets;
+      const fireRamp = Math.max(mgPlaneFireRampFloor, 1 - state.elapsed * mgPlaneFireRamp);
+      for (let i = 0; i < enemies.length; i += 1) {
+        const enemy = enemies[i];
+        if (enemy.fireTimer < 0) continue;
+        if (enemy.y < -enemy.height * 0.2 || enemy.y > state.height * 0.7) continue;
+        enemy.fireTimer -= dt;
+        if (enemy.fireTimer > 0) continue;
+        if (enemy.type === 'fighter') {
+          enemy.fireTimer =
+            (mgPlaneFighterFireMin + mgPlaneRandom(state) * (mgPlaneFighterFireMax - mgPlaneFighterFireMin)) * fireRamp;
+          const dx = player.x - enemy.x;
+          const dy = Math.max(80, player.y - enemy.y);
+          const length = Math.max(1, Math.hypot(dx, dy));
+          mgPlaneSpawnEnemyBullet(
+            state,
+            enemy.x,
+            enemy.y + enemy.height * 0.4,
+            (dx / length) * mgPlaneEnemyBulletSpeed,
+            (dy / length) * mgPlaneEnemyBulletSpeed,
+          );
+        } else {
+          enemy.fireTimer =
+            (mgPlaneHeavyFireMin + mgPlaneRandom(state) * (mgPlaneHeavyFireMax - mgPlaneHeavyFireMin)) * fireRamp;
+          const angles = [-0.24, 0, 0.24];
+          for (let a = 0; a < angles.length; a += 1) {
+            const angle = angles[a];
+            mgPlaneSpawnEnemyBullet(
+              state,
+              enemy.x,
+              enemy.y + enemy.height * 0.45,
+              Math.sin(angle) * mgPlaneEnemyBulletSpeed,
+              Math.cos(angle) * mgPlaneEnemyBulletSpeed,
+            );
+          }
+        }
+        mgPlanePushEvent(state, { type: 'enemy-shot' });
+      }
+
       /* bullets vs enemies: one bullet damages at most one enemy, consumed. */
       for (let i = enemies.length - 1; i >= 0; i -= 1) {
         const enemy = enemies[i];
@@ -1241,17 +1325,40 @@ window.__ModuleLoader__.load({
           const def = PLANE_ENEMY_TYPES[enemy.type] || PLANE_ENEMY_TYPES.scout;
           enemies.splice(i, 1);
           mgPlaneExplode(state, enemy.x, enemy.y, def.tone || 1);
-          state.lives -= 1;
-          state.shake = 1;
-          player.invuln = mgPlaneInvulnTime;
-          mgPlanePushEvent(state, { type: 'damage' });
-          if (state.lives <= 0) {
-            state.lives = 0;
-            state.phase = 'over';
-            if (state.score > state.best) state.best = state.score;
-            mgPlanePushEvent(state, { type: 'over' });
-          }
+          mgPlaneDamagePlayer(state);
           break;
+        }
+      }
+
+      /* enemy bullets --------------------------------------------------- */
+      for (let i = enemyBullets.length - 1; i >= 0; i -= 1) {
+        const enemyBullet = enemyBullets[i];
+        enemyBullet.x += enemyBullet.vx * dt;
+        enemyBullet.y += enemyBullet.vy * dt;
+        if (
+          enemyBullet.y - enemyBullet.height / 2 > state.height + 10 ||
+          enemyBullet.x < -20 ||
+          enemyBullet.x > state.width + 20
+        ) {
+          enemyBullets.splice(i, 1);
+          continue;
+        }
+        if (
+          player.invuln <= 0 &&
+          mgPlaneOverlap(
+            player.x,
+            player.y,
+            player.width * 0.7,
+            player.height * 0.7,
+            enemyBullet.x,
+            enemyBullet.y,
+            enemyBullet.width,
+            enemyBullet.height,
+          )
+        ) {
+          enemyBullets.splice(i, 1);
+          mgPlaneExplode(state, enemyBullet.x, enemyBullet.y, 1);
+          mgPlaneDamagePlayer(state);
         }
       }
 
@@ -1353,8 +1460,8 @@ window.__ModuleLoader__.load({
         'plane.pausedTitle': 'Paused',
         'plane.overTitle': 'Game over',
         'plane.newBest': 'New best!',
-        'plane.tipIdle': 'Drag the plane to dodge enemies. It fires automatically.',
-        'plane.hint': 'Drag to move · auto-fire · 3 lives',
+        'plane.tipIdle': 'Drag the plane to dodge enemies and their fire. It fires automatically.',
+        'plane.hint': 'Drag to move · auto-fire · dodge enemy bullets',
         'plane.final': 'Score {score} · Best {best}',
         'status.yourTurn': 'Your move',
         'status.aiThinking': 'AI is thinking…',
@@ -1411,8 +1518,8 @@ window.__ModuleLoader__.load({
         'plane.pausedTitle': '已暂停',
         'plane.overTitle': '游戏结束',
         'plane.newBest': '新纪录！',
-        'plane.tipIdle': '拖动飞机躲避敌机，子弹自动发射。',
-        'plane.hint': '拖动移动 · 自动开火 · 三条命',
+        'plane.tipIdle': '拖动飞机躲避敌机与弹幕，子弹自动发射。',
+        'plane.hint': '拖动移动 · 自动开火 · 躲避敌机弹幕',
         'plane.final': '本局 {score} 分 · 最高 {best} 分',
         'status.yourTurn': '轮到你落子',
         'status.aiThinking': 'AI 正在思考…',
@@ -2103,6 +2210,32 @@ window.__ModuleLoader__.load({
       gain.connect(context.destination);
       osc.start(start);
       osc.stop(start + 0.32);
+    }
+
+    /** Rate limiter so a wave of enemy fire does not turn into a drone. */
+    let lastEnemyShotSoundAt = 0;
+
+    /** A quiet low blip when an enemy opens fire. */
+    function playEnemyShotSound(enabled) {
+      if (!enabled) return;
+      const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      if (now - lastEnemyShotSoundAt < 220) return;
+      lastEnemyShotSoundAt = now;
+      const context = ensureAudioContext();
+      if (!context) return;
+      const start = context.currentTime;
+      const osc = context.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(360, start);
+      osc.frequency.exponentialRampToValueAtTime(190, start + 0.08);
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.03, start + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start(start);
+      osc.stop(start + 0.12);
     }
 
     /** Release the audio context when the plugin unloads. */
@@ -2832,6 +2965,16 @@ window.__ModuleLoader__.load({
         ctx.fillRect(bullet.x - bullet.width / 2, bullet.y - bullet.height / 2, bullet.width, bullet.height);
       }
 
+      /* enemy bullets: warm dots, clearly different from the white tracers */
+      const enemyBullets = state.enemyBullets || [];
+      ctx.fillStyle = '#ffb347';
+      for (let i = 0; i < enemyBullets.length; i += 1) {
+        const enemyBullet = enemyBullets[i];
+        ctx.beginPath();
+        ctx.arc(enemyBullet.x, enemyBullet.y, Math.max(2, enemyBullet.width * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       /* enemies */
       for (let i = 0; i < state.enemies.length; i += 1) drawEnemyPlane(ctx, state.enemies[i]);
 
@@ -2964,6 +3107,7 @@ window.__ModuleLoader__.load({
               for (let i = 0; i < state.lastEvents.length; i += 1) {
                 const event = state.lastEvents[i];
                 if (event.type === 'shot') playShotSound(soundOnRef.current);
+                else if (event.type === 'enemy-shot') playEnemyShotSound(soundOnRef.current);
                 else if (event.type === 'explode') playExplosionSound(soundOnRef.current, event.size || 1);
                 else if (event.type === 'damage') playDamageSound(soundOnRef.current);
               }
