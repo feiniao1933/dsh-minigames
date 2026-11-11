@@ -127,7 +127,9 @@ An underwater Flappy-Bird remake where the bird is the DSH whale.
   point and the current speed slowly increases. Touching a column or the seabed
   ends the run.
 - The scene is underwater: light shafts, rising bubbles, a wavy seabed with
-  seagrass, and a tilt that follows the whale's vertical speed.
+  seagrass, and a whale that drifts rather than darts — slower gravity, a softer
+  flap, an eased nose tilt, an idle bob before you start and trailing wake
+  bubbles behind the tail.
 - Best score is kept in `localStorage`; pause/resume, restart, auto-pause when
   the tab is hidden, and muted audio all work like the other arcade game.
 

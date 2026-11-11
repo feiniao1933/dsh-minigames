@@ -361,7 +361,7 @@ run('3. gravity, flap reversal, repeated-flap and ceiling clamps', () => {
   const clampedY = clamped.bird.y;
   stepFlappy(clamped, 10);
   closeTo(clamped.elapsed, 0.05, 1e-9, 'dt is clamped to 0.05 s');
-  closeTo(clamped.bird.y - clampedY, 75 * 0.05, 1e-9, 'physics runs with the clamped dt');
+  closeTo(clamped.bird.y - clampedY, FLAPPY_TUNING.gravity * 0.05 * 0.05, 1e-9, 'physics runs with the clamped dt');
 
   const broken = newRunning(8);
   const brokenElapsed = broken.elapsed;
@@ -386,13 +386,14 @@ run('4. pipes spawn off-screen right, scroll, cull and stay bounded', () => {
   checkEqual(first.scored, false, 'fresh pipe is unscored');
 
   const x0 = first.x;
-  let spawned = null;
-  for (let i = 0; i < 120; i += 1) {
-    safeStep(state, 1);
-    if (!spawned && state.pipes.length > 1) spawned = { x: state.pipes[1].x, id: state.pipes[1].id };
-  }
+  for (let i = 0; i < 120; i += 1) safeStep(state, 1);
   check(first.x < x0, 'pipes scroll left');
   closeTo(first.x, x0 - FLAPPY_TUNING.baseSpeed * 2, 1e-6, 'scroll distance matches baseSpeed after 2 s');
+  let spawned = null;
+  for (let i = 0; i < 400 && spawned === null; i += 1) {
+    safeStep(state, 1);
+    if (state.pipes.length > 1) spawned = { x: state.pipes[1].x, id: state.pipes[1].id };
+  }
   checkEqual(state.pipes.length, 2, 'second pair spawned after spacing delay');
   check(spawned !== null, 'second pair was observed appearing');
   check(spawned !== null && spawned.x > state.width, 'new pair enters right of the world');

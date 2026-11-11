@@ -29,7 +29,7 @@ export const FLAPPY_BIRD = { width: 40, height: 28 };
 /**
  * Documented tuning numbers (the UI may read them but must not depend on them).
  *
- *   gravity      downward acceleration in px/s^2
+ *   gravity      downward acceleration in px/s^2 (water is denser: slow, floaty)
  *   flapVelocity vy set by a flap (negative = upward), px/s
  *   maxFallSpeed terminal fall speed, px/s
  *   pipeWidth    coral column width, px
@@ -40,14 +40,16 @@ export const FLAPPY_BIRD = { width: 40, height: 28 };
  *   ceilMargin   extra inset below the top edge for the (non-fatal) ceiling
  */
 export const FLAPPY_TUNING = {
-  gravity: 1500,
-  flapVelocity: -420,
-  maxFallSpeed: 760,
+  /* Slow, buoyant physics so the whale drifts instead of darting. */
+  gravity: 900,
+  flapVelocity: -290,
+  maxFallSpeed: 420,
   pipeWidth: 62,
-  pipeGap: 172,
+  pipeGap: 180,
   pipeSpacing: 205,
-  baseSpeed: 150,
-  speedRamp: 2.2,
+  /* A gentler current: coral scrolls slower and ramps up softly. */
+  baseSpeed: 118,
+  speedRamp: 1.4,
   ceilMargin: 0,
 };
 
@@ -58,7 +60,7 @@ export const FLAPPY_TUNING = {
 const flappyMaxDt = 0.05;
 const flappyBirdX = FLAPPY_WORLD.width * 0.3;
 const flappyBirdStartRatio = 0.45;
-const flappyMaxSpeedBonus = 90;
+const flappyMaxSpeedBonus = 60;
 const flappyFirstPipeOffset = 80;
 const flappyGapTopMargin = 90;
 const flappyGapBottomMargin = 110;
@@ -72,7 +74,7 @@ const flappyBubbleMinDrift = 4;
 const flappyBubbleDriftRange = 10;
 const flappyBubbleWrapShift = 41.7;
 const flappyEventCap = 6;
-const flappyAngleDivisor = 820;
+const flappyAngleDivisor = 560;
 const flappyAngleMin = -0.5;
 const flappyAngleMax = 0.85;
 

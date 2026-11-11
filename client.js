@@ -1420,7 +1420,7 @@ window.__ModuleLoader__.load({
     /**
      * Documented tuning numbers (the UI may read them but must not depend on them).
      *
-     *   gravity      downward acceleration in px/s^2
+     *   gravity      downward acceleration in px/s^2 (water is denser: slow, floaty)
      *   flapVelocity vy set by a flap (negative = upward), px/s
      *   maxFallSpeed terminal fall speed, px/s
      *   pipeWidth    coral column width, px
@@ -1431,14 +1431,16 @@ window.__ModuleLoader__.load({
      *   ceilMargin   extra inset below the top edge for the (non-fatal) ceiling
      */
     const FLAPPY_TUNING = {
-      gravity: 1500,
-      flapVelocity: -420,
-      maxFallSpeed: 760,
+      /* Slow, buoyant physics so the whale drifts instead of darting. */
+      gravity: 900,
+      flapVelocity: -290,
+      maxFallSpeed: 420,
       pipeWidth: 62,
-      pipeGap: 172,
+      pipeGap: 180,
       pipeSpacing: 205,
-      baseSpeed: 150,
-      speedRamp: 2.2,
+      /* A gentler current: coral scrolls slower and ramps up softly. */
+      baseSpeed: 118,
+      speedRamp: 1.4,
       ceilMargin: 0,
     };
 
@@ -1449,7 +1451,7 @@ window.__ModuleLoader__.load({
     const flappyMaxDt = 0.05;
     const flappyBirdX = FLAPPY_WORLD.width * 0.3;
     const flappyBirdStartRatio = 0.45;
-    const flappyMaxSpeedBonus = 90;
+    const flappyMaxSpeedBonus = 60;
     const flappyFirstPipeOffset = 80;
     const flappyGapTopMargin = 90;
     const flappyGapBottomMargin = 110;
@@ -1463,7 +1465,7 @@ window.__ModuleLoader__.load({
     const flappyBubbleDriftRange = 10;
     const flappyBubbleWrapShift = 41.7;
     const flappyEventCap = 6;
-    const flappyAngleDivisor = 820;
+    const flappyAngleDivisor = 560;
     const flappyAngleMin = -0.5;
     const flappyAngleMax = 0.85;
 
@@ -2648,16 +2650,16 @@ window.__ModuleLoader__.load({
       const start = context.currentTime;
       const osc = context.createOscillator();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(340, start);
-      osc.frequency.exponentialRampToValueAtTime(760, start + 0.12);
+      osc.frequency.setValueAtTime(240, start);
+      osc.frequency.exponentialRampToValueAtTime(520, start + 0.18);
       const gain = context.createGain();
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.06, start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+      gain.gain.exponentialRampToValueAtTime(0.055, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
       osc.connect(gain);
       gain.connect(context.destination);
       osc.start(start);
-      osc.stop(start + 0.16);
+      osc.stop(start + 0.24);
     }
 
     /** Two-note ding when a coral gap is passed. */
@@ -3944,14 +3946,34 @@ window.__ModuleLoader__.load({
       ctx.closePath();
     }
 
-    /** Paint the whale at its current position, tilted by its vertical speed. */
-    function drawWhaleBird(ctx, bird, elapsed) {
+    /** Paint the whale with a softly eased tilt, a gentle idle bob and wake bubbles. */
+    function drawWhaleBird(ctx, bird, view, phase) {
       const halfW = bird.width / 2;
       const halfH = bird.height / 2;
-      const tilt = Math.max(-0.5, Math.min(0.75, (bird.vy || 0) / 1100));
+      const clock = (view && view.clock) || 0;
+      const tilt = view && Number.isFinite(view.tilt) ? view.tilt : bird.angle || 0;
+      const running = phase === 'running';
+      const bob = running ? 0 : Math.sin(clock * 1.4) * 4;
+      const sway = running ? Math.sin(clock * 1.6) * 1.2 : Math.sin(clock * 0.8) * 3;
+      /* little wake bubbles behind the tail while it is moving */
+      if (running && Math.abs(bird.vy || 0) > 24) {
+        for (let i = 0; i < 3; i += 1) {
+          const fade = 0.34 - i * 0.08;
+          ctx.beginPath();
+          ctx.arc(
+            bird.x - halfW * 1.3 - i * 7 + sway * 0.5,
+            bird.y + halfH * 0.25 + Math.sin(clock * 2.1 + i) * 4 + i * 3,
+            1.6 + i * 0.5,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fillStyle = `rgba(205, 238, 255, ${fade.toFixed(2)})`;
+          ctx.fill();
+        }
+      }
       ctx.save();
-      ctx.translate(bird.x, bird.y);
-      ctx.rotate(tilt * 0.9);
+      ctx.translate(bird.x + sway, bird.y + bob);
+      ctx.rotate(tilt);
       /* tail fluke on the left */
       ctx.beginPath();
       ctx.moveTo(-halfW * 0.78, 0);
@@ -4088,7 +4110,7 @@ window.__ModuleLoader__.load({
         ctx.stroke();
       }
 
-      drawWhaleBird(ctx, state.bird, elapsed);
+      drawWhaleBird(ctx, state.bird, view, state.phase);
     }
 
     /** Underwater Flappy-Bird style game where the bird is the DSH whale. */
@@ -4162,7 +4184,15 @@ window.__ModuleLoader__.load({
           gradient.addColorStop(0, '#0b4a6b');
           gradient.addColorStop(0.55, '#07283f');
           gradient.addColorStop(1, '#03121d');
-          viewRef.current = { pxW, pxH, paintScale: pxW / FLAPPY_WORLD.width, gradient };
+          const previous = viewRef.current;
+          viewRef.current = {
+            pxW,
+            pxH,
+            paintScale: pxW / FLAPPY_WORLD.width,
+            gradient,
+            clock: previous ? previous.clock : 0,
+            tilt: previous ? previous.tilt : 0,
+          };
         };
         resize();
         resizeRef.current = resize;
@@ -4196,6 +4226,12 @@ window.__ModuleLoader__.load({
           let dt = (now - previous) / 1000;
           if (!Number.isFinite(dt) || dt < 0) dt = 0;
           if (dt > 0.05) dt = 0.05;
+          const view = viewRef.current;
+          if (view) {
+            view.clock += dt;
+            const targetTilt = Number.isFinite(state.bird.angle) ? state.bird.angle : 0;
+            view.tilt += (targetTilt - (view.tilt || 0)) * Math.min(1, dt * 4.5);
+          }
           if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
             stepFlappy(state, dt);
             if (state.lastEvents && state.lastEvents.length > 0) {
