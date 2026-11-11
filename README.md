@@ -1,5 +1,10 @@
 # dsh-minigames · 游戏盒子
 
+[![Open Plugin Market](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-minigames.json)](https://dshopen.org/zh/plugins/dsh-minigames/)
+
+Listed in the [Open Plugin Market](https://dshopen.org/zh/plugins/dsh-minigames/)
+as a community plugin (index source: `https://dshopen.org/index.json`).
+
 A mini-games box for the DSH Web right sidebar. It ships two games:
 
 - **Gomoku (五子棋)** against the built-in AI in three difficulties; winning

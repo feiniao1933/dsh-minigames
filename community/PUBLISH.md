@@ -2,10 +2,12 @@
 
 ## 发布渠道
 
-- **Open Plugin Market（dshopen.org）**：已提交收录申请（Git 固定提交来源），等待维护者审查
-  - Issue：https://github.com/polang233/dsh-plugin-index/issues/413
+- **Open Plugin Market（dshopen.org）**：✅ 已收录（2026-11-11，维护者确认按 1.1.1 收录）
+  - 插件页：https://dshopen.org/zh/plugins/dsh-minigames/
+  - 收录 Issue（已关闭）：https://github.com/polang233/dsh-plugin-index/issues/413
+  - 1.2.0 / 1.3.0 的版本升级已按规则回复在原 Issue，等待维护者复核升版
   - 版本 1.3.0（五子棋进度记忆 + 新游戏盒子图标），固定提交 `ee3cb204a227900d680682aa7d6736d2fb59dac3`
-- **awesome-dsh-plugin（dsh-market 目录）**：已提交单文件 PR，等待 CI / 维护者
+- **awesome-dsh-plugin（dsh-market 目录）**：PR 已提交，仓库年龄 gate 即将满足（2026-11-11 14:48 UTC 满 24h）
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
   - 条目：`data/plugins/feiniao1933__dsh-minigames.yml`（category `ui`）
 - **npm**：未发布（本机未登录 npm；Git 固定提交来源已满足 dshopen 要求）
