@@ -1389,6 +1389,372 @@ window.__ModuleLoader__.load({
       return state;
     }
 
+    /**
+     * Pure simulation core for the underwater Flappy-Bird clone "鲸鱼飞飞"
+     * (Flappy whale) in the DSH "游戏盒子" plugin.
+     *
+     * Contract (must hold for `build.mjs`, which strips leading `export ` lines and
+     * concatenates this file into one browser function scope together with
+     * `src/engine.js`, `src/plane.js` and `src/ui.js`):
+     *   - self-contained ESM with NO imports, NO DOM/canvas, NO audio, NO timers,
+     *     NO async / top-level await and NO `export default`;
+     *   - all module-level identifiers are unique: the public `FLAPPY_*` constants,
+     *     the exported functions and internals prefixed `mgFlappy`/`flappy`;
+     *     never define `React`, `apply`, `inject`, `PLANE_*`, `mgPlane*`, etc.;
+     *   - state is a plain JSON-able object (no class instances, no Infinity/NaN);
+     *     ids are unique and every entity array is bounded.
+     *
+     * World is fixed at 360 x 600 logical units (origin top-left, y grows down).
+     * The whale's x is fixed, only y changes; the body of the whale is the AABB
+     * `FLAPPY_BIRD`, `bird.x`/`bird.y` are the box CENTRE. Simulation is
+     * frame-rate independent: `stepFlappy(state, dtSeconds)` clamps dt to <= 0.05 s.
+     *
+     * The UI owns input, rendering (whale, light rays, seabed, bubbles, coral
+     * pipes), audio, HUD/pause overlays and best-score persistence. It consumes
+     * `state.lastEvents` after every step; this file never touches the outside.
+     */
+
+    const FLAPPY_WORLD = { width: 360, height: 600 };
+    const FLAPPY_BIRD = { width: 40, height: 28 };
+
+    /**
+     * Documented tuning numbers (the UI may read them but must not depend on them).
+     *
+     *   gravity      downward acceleration in px/s^2
+     *   flapVelocity vy set by a flap (negative = upward), px/s
+     *   maxFallSpeed terminal fall speed, px/s
+     *   pipeWidth    coral column width, px
+     *   pipeGap      vertical opening between the two columns, px
+     *   pipeSpacing  horizontal distance between pipe-pair centres, px
+     *   baseSpeed    scroll speed at score 0, px/s
+     *   speedRamp    extra scroll speed per point, px/s
+     *   ceilMargin   extra inset below the top edge for the (non-fatal) ceiling
+     */
+    const FLAPPY_TUNING = {
+      gravity: 1500,
+      flapVelocity: -420,
+      maxFallSpeed: 760,
+      pipeWidth: 62,
+      pipeGap: 172,
+      pipeSpacing: 205,
+      baseSpeed: 150,
+      speedRamp: 2.2,
+      ceilMargin: 0,
+    };
+
+    /* ------------------------------------------------------------------ */
+    /* Internal constants (flappy/mgFlappy prefix protects bundle scope)   */
+    /* ------------------------------------------------------------------ */
+
+    const flappyMaxDt = 0.05;
+    const flappyBirdX = FLAPPY_WORLD.width * 0.3;
+    const flappyBirdStartRatio = 0.45;
+    const flappyMaxSpeedBonus = 90;
+    const flappyFirstPipeOffset = 80;
+    const flappyGapTopMargin = 90;
+    const flappyGapBottomMargin = 110;
+    const flappyMaxPipes = 5;
+    const flappyBubbleCount = 40;
+    const flappyBubbleMinSize = 2;
+    const flappyBubbleSizeRange = 5;
+    const flappyBubbleMinSpeed = 14;
+    const flappyBubbleSpeedRange = 34;
+    const flappyBubbleMinDrift = 4;
+    const flappyBubbleDriftRange = 10;
+    const flappyBubbleWrapShift = 41.7;
+    const flappyEventCap = 6;
+    const flappyAngleDivisor = 820;
+    const flappyAngleMin = -0.5;
+    const flappyAngleMax = 0.85;
+
+    /* ------------------------------------------------------------------ */
+    /* Deterministic RNG (mulberry32, state kept as a uint32 inside state) */
+    /* ------------------------------------------------------------------ */
+
+    function mgFlappyRandom(state) {
+      let t = (state.rng = (state.rng + 0x6d2b79f5) >>> 0);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Small helpers                                                       */
+    /* ------------------------------------------------------------------ */
+
+    /** Push a UI-triggering event, hard-capped so one step stays bounded. */
+    function mgFlappyPushEvent(state, event) {
+      if (state.lastEvents.length < flappyEventCap) state.lastEvents.push(event);
+    }
+
+    /** Render-only pitch in radians: negative noses up, positive noses down. */
+    function mgFlappyAngleForVy(vy) {
+      const normalized = vy / flappyAngleDivisor;
+      if (normalized < flappyAngleMin) return flappyAngleMin;
+      if (normalized > flappyAngleMax) return flappyAngleMax;
+      return normalized;
+    }
+
+    /** Current scroll speed for a score (also mirrored into state.speed). */
+    function mgFlappySpeedForScore(score) {
+      return FLAPPY_TUNING.baseSpeed + Math.min(flappyMaxSpeedBonus, score * FLAPPY_TUNING.speedRamp);
+    }
+
+    /** Axis-aligned box overlap, boxes given as left/top/width/height. */
+    function mgFlappyOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+      return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+    }
+
+    /** True when the whale body overlaps the top or bottom coral column. */
+    function mgFlappyHitsPipe(state, pipe) {
+      const bird = state.bird;
+      const birdLeft = bird.x - bird.width / 2;
+      const birdTop = bird.y - bird.height / 2;
+      const pipeLeft = pipe.x - pipe.width / 2;
+      const gapTop = pipe.gapY - pipe.gapHeight / 2;
+      const gapBottom = pipe.gapY + pipe.gapHeight / 2;
+      if (mgFlappyOverlap(birdLeft, birdTop, bird.width, bird.height, pipeLeft, 0, pipe.width, gapTop)) {
+        return true;
+      }
+      return mgFlappyOverlap(
+        birdLeft,
+        birdTop,
+        bird.width,
+        bird.height,
+        pipeLeft,
+        gapBottom,
+        pipe.width,
+        state.height - gapBottom,
+      );
+    }
+
+    /** End the run: one hit (or the seabed) is fatal, then record the best. */
+    function mgFlappyEndRun(state) {
+      state.phase = 'over';
+      if (state.score > state.best) state.best = state.score;
+      state.bird.vy = 0;
+      mgFlappyPushEvent(state, { type: 'hit' });
+      mgFlappyPushEvent(state, { type: 'over' });
+      return state;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Entity factories                                                    */
+    /* ------------------------------------------------------------------ */
+
+    /** Create one coral pipe pair centred at `x` with a random safe opening. */
+    function mgFlappySpawnPipe(state, x) {
+      if (state.pipes.length >= flappyMaxPipes) return;
+      const gap = FLAPPY_TUNING.pipeGap;
+      const minGapY = gap / 2 + flappyGapTopMargin;
+      const maxGapY = state.height - gap / 2 - flappyGapBottomMargin;
+      const gapY = minGapY + mgFlappyRandom(state) * (maxGapY - minGapY);
+      state.pipes.push({
+        id: state.nextPipeId,
+        x,
+        gapY,
+        gapHeight: gap,
+        width: FLAPPY_TUNING.pipeWidth,
+        height: state.height,
+        scored: false,
+      });
+      state.nextPipeId += 1;
+    }
+
+    /**
+     * Spawn the first pair off-screen right, then keep pipeSpacing between pairs
+     * (the arrival delay makes the first gap readable). Always keeps <= 5 pairs.
+     */
+    function mgFlappySpawnDue(state) {
+      if (state.pipes.length >= flappyMaxPipes) return;
+      if (state.pipes.length === 0) {
+        mgFlappySpawnPipe(state, state.width + flappyFirstPipeOffset);
+        return;
+      }
+      const last = state.pipes[state.pipes.length - 1];
+      const entryX = state.width + FLAPPY_TUNING.pipeWidth / 2;
+      if (last.x <= entryX - FLAPPY_TUNING.pipeSpacing) {
+        mgFlappySpawnPipe(state, entryX);
+      }
+    }
+
+    /** Deterministic decoration only: rising bubbles, fixed count. */
+    function mgFlappyResetBubbles(state) {
+      state.bubbles.length = 0;
+      for (let i = 0; i < flappyBubbleCount; i += 1) {
+        state.bubbles.push({
+          id: i + 1,
+          x: mgFlappyRandom(state) * state.width,
+          y: mgFlappyRandom(state) * state.height,
+          size: flappyBubbleMinSize + mgFlappyRandom(state) * flappyBubbleSizeRange,
+          speed: flappyBubbleMinSpeed + mgFlappyRandom(state) * flappyBubbleSpeedRange,
+          drift: flappyBubbleMinDrift + mgFlappyRandom(state) * flappyBubbleDriftRange,
+          phase: mgFlappyRandom(state) * Math.PI * 2,
+        });
+      }
+    }
+
+    /** Rise, sway, and wrap from above the top back to below the seabed. */
+    function mgFlappyStepBubbles(state, dt) {
+      const bubbles = state.bubbles;
+      for (let i = 0; i < bubbles.length; i += 1) {
+        const bubble = bubbles[i];
+        bubble.y -= bubble.speed * dt;
+        bubble.x += Math.sin(state.elapsed * 0.7 + bubble.phase) * bubble.drift * dt;
+        if (bubble.y + bubble.size * 2 < 0) {
+          bubble.y = state.height + bubble.size * 2;
+          const shifted = bubble.x + flappyBubbleWrapShift + bubble.size;
+          bubble.x = shifted % (state.width + bubble.size * 2);
+        }
+        if (bubble.x < -bubble.size) bubble.x += state.width + bubble.size * 2;
+        else if (bubble.x > state.width + bubble.size) bubble.x -= state.width + bubble.size * 2;
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Public API                                                          */
+    /* ------------------------------------------------------------------ */
+
+    function createFlappyState(seed) {
+      const seedValue = Number.isFinite(seed)
+        ? Math.floor(seed) >>> 0
+        : ((Date.now() >>> 0) ^ 0x9e3779b9) >>> 0;
+      const state = {
+        phase: 'idle',
+        width: FLAPPY_WORLD.width,
+        height: FLAPPY_WORLD.height,
+        bird: {
+          x: flappyBirdX,
+          y: FLAPPY_WORLD.height * flappyBirdStartRatio,
+          width: FLAPPY_BIRD.width,
+          height: FLAPPY_BIRD.height,
+          vy: 0,
+          angle: 0,
+        },
+        pipes: [],
+        bubbles: [],
+        score: 0,
+        best: 0,
+        elapsed: 0,
+        speed: FLAPPY_TUNING.baseSpeed,
+        nextPipeId: 1,
+        rng: seedValue,
+        lastEvents: [],
+      };
+      mgFlappyResetBubbles(state);
+      return state;
+    }
+
+    /**
+     * Reset the run and go. Mutates and returns `state`; keeps the best score
+     * (a higher `options.best` is adopted too, like the plane game).
+     */
+    function startFlappy(state, options) {
+      const best = options && options.best;
+      if (Number.isFinite(best) && best > state.best) state.best = best;
+      state.phase = 'running';
+      state.score = 0;
+      state.elapsed = 0;
+      state.speed = FLAPPY_TUNING.baseSpeed;
+      state.nextPipeId = 1;
+      state.pipes.length = 0;
+      state.lastEvents.length = 0;
+      const bird = state.bird;
+      bird.x = flappyBirdX;
+      bird.y = state.height * flappyBirdStartRatio;
+      bird.vy = 0;
+      bird.angle = 0;
+      mgFlappyResetBubbles(state);
+      mgFlappySpawnPipe(state, state.width + flappyFirstPipeOffset);
+      return state;
+    }
+
+    function pauseFlappy(state) {
+      if (state.phase === 'running') state.phase = 'paused';
+      return state;
+    }
+
+    function resumeFlappy(state) {
+      if (state.phase === 'paused') state.phase = 'running';
+      return state;
+    }
+
+    /** Flap: instant upward velocity. Only meaningful while running. */
+    function flapFlappy(state) {
+      if (state.phase !== 'running') return state;
+      state.bird.vy = FLAPPY_TUNING.flapVelocity;
+      state.bird.angle = mgFlappyAngleForVy(state.bird.vy);
+      mgFlappyPushEvent(state, { type: 'flap' });
+      return state;
+    }
+
+    function flappyBestOf(state) {
+      return state && Number.isFinite(state.best) ? state.best : 0;
+    }
+
+    /** Advance the simulation. No-op unless phase==='running'. */
+    function stepFlappy(state, dtSeconds) {
+      if (!state || state.phase !== 'running') return state;
+
+      state.lastEvents.length = 0;
+
+      let dt = Number(dtSeconds);
+      if (!Number.isFinite(dt) || dt < 0) dt = 0;
+      if (dt > flappyMaxDt) dt = flappyMaxDt;
+      if (dt === 0) return state;
+
+      const bird = state.bird;
+      state.elapsed += dt;
+      state.speed = mgFlappySpeedForScore(state.score);
+
+      /* whale physics --------------------------------------------------- */
+      bird.vy = Math.min(FLAPPY_TUNING.maxFallSpeed, bird.vy + FLAPPY_TUNING.gravity * dt);
+      bird.y += bird.vy * dt;
+      bird.angle = mgFlappyAngleForVy(bird.vy);
+
+      /* non-fatal ceiling: keep the whole box inside the top of the world */
+      const ceilingY = bird.height / 2 + FLAPPY_TUNING.ceilMargin;
+      if (bird.y < ceilingY) {
+        bird.y = ceilingY;
+        if (bird.vy < 0) bird.vy = 0;
+        bird.angle = mgFlappyAngleForVy(bird.vy);
+      }
+
+      /* pipes: spawn off-screen right, scroll left, cull off-screen left --- */
+      mgFlappySpawnDue(state);
+      const pipes = state.pipes;
+      const dx = state.speed * dt;
+      for (let i = 0; i < pipes.length; i += 1) pipes[i].x -= dx;
+      for (let i = pipes.length - 1; i >= 0; i -= 1) {
+        if (pipes[i].x + pipes[i].width / 2 < 0) pipes.splice(i, 1);
+      }
+
+      /* scoring: the pair's right edge passed the whale's left edge ----- */
+      const birdLeft = bird.x - bird.width / 2;
+      for (let i = 0; i < pipes.length; i += 1) {
+        const pipe = pipes[i];
+        if (!pipe.scored && pipe.x + pipe.width / 2 < birdLeft) {
+          pipe.scored = true;
+          state.score += 1;
+          mgFlappyPushEvent(state, { type: 'score' });
+        }
+      }
+
+      /* fatal collisions: either coral column, then the seabed ---------- */
+      for (let i = 0; i < pipes.length; i += 1) {
+        if (mgFlappyHitsPipe(state, pipes[i])) return mgFlappyEndRun(state);
+      }
+      if (bird.y + bird.height / 2 >= state.height) {
+        bird.y = state.height - bird.height / 2;
+        return mgFlappyEndRun(state);
+      }
+
+      /* decoration + exposed derived values ----------------------------- */
+      mgFlappyStepBubbles(state, dt);
+      state.speed = mgFlappySpeedForScore(state.score);
+      return state;
+    }
+
     /* Client half of the mini-games bundle.
      *
      * Contributes one right-sidebar tab type ("游戏盒子" / mini games box) through
@@ -1425,10 +1791,11 @@ window.__ModuleLoader__.load({
       hard: { id: 'hard', maxDepth: 6, timeBudgetMs: 430 },
     };
     const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
-    const GAME_ORDER = ['gomoku', 'plane'];
+    const GAME_ORDER = ['gomoku', 'plane', 'flappy'];
     const GAME_KEY = 'dsh.minigames.game.v1';
     const GOMOKU_SAVE_KEY = 'dsh.minigames.gomoku.save.v1';
     const PLANE_BEST_KEY = 'dsh.minigames.plane.best.v1';
+    const FLAPPY_BEST_KEY = 'dsh.minigames.flappy.best.v1';
     const DEFAULT_DIFFICULTY = 'hard';
     const DIFFICULTY_KEY = 'dsh.minigames.difficulty.v1';
     const SOUND_KEY = 'dsh.minigames.sound.v1';
@@ -1449,6 +1816,10 @@ window.__ModuleLoader__.load({
         'game.gomoku.desc': 'Human vs AI · {difficulty}',
         'game.plane': 'Sky shooter',
         'game.plane.desc': 'Arcade shooter · classic remake',
+        'game.flappy': 'Flappy whale',
+        'game.flappy.desc': 'Underwater flappy · tap to rise',
+        'flappy.tipIdle': 'Tap or press Space to swim up. Pass the coral gaps.',
+        'flappy.hint': 'Click or Space to rise · dodge the coral',
         'game.more': 'More games',
         'game.more.desc': 'Coming soon',
         'plane.score': 'Score',
@@ -1507,6 +1878,10 @@ window.__ModuleLoader__.load({
         'game.gomoku.desc': '人机对弈 · {difficulty}',
         'game.plane': '打飞机',
         'game.plane.desc': '街机射击 · 经典复刻',
+        'game.flappy': '鲸鱼飞飞',
+        'game.flappy.desc': '海底飞行 · 点击上浮',
+        'flappy.tipIdle': '点击或按空格让鲸鱼上浮，穿过珊瑚间隙。',
+        'flappy.hint': '点击或空格上浮 · 躲开珊瑚',
         'game.more': '更多游戏',
         'game.more.desc': '敬请期待',
         'plane.score': '得分',
@@ -1574,7 +1949,7 @@ window.__ModuleLoader__.load({
       --mg-gold: #e8a324;
       --mg-gold-soft: rgba(255, 197, 61, .18);
     }
-    .mgRoot[data-game="plane"] { overflow: hidden; }
+    .mgRoot[data-game="plane"], .mgRoot[data-game="flappy"] { overflow: hidden; }
     body[data-ds-dark-theme] .mgRoot {
       --mg-board-face-1: #c99c66;
       --mg-board-face-2: #a87b49;
@@ -1612,7 +1987,9 @@ window.__ModuleLoader__.load({
     .mgRecord b[data-k="l"] { color: var(--dsw-alias-state-error-primary); }
     .mgRecord b[data-k="d"] { color: var(--dsw-alias-label-tertiary); }
     .mgRecordSep { color: var(--dsw-alias-border-l2); }
-    .mgShelf { display: flex; gap: 8px; }
+    .mgShelf { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mgShelf .mgCard { flex: 1 1 calc(33% - 8px); min-width: 104px; padding: 8px 9px; gap: 8px; }
+    .mgShelf .mgCardIcon { width: 24px; height: 24px; }
     .mgCard {
       flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 10px;
       padding: 9px 11px; text-align: left; font: inherit; color: inherit;
@@ -1766,7 +2143,7 @@ window.__ModuleLoader__.load({
     .mgMorePlus { font-size: 13px; line-height: 1; }
     .mgPane { display: flex; flex-direction: column; gap: 12px; }
     .mgPane[hidden] { display: none !important; }
-    .mgPanePlane { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
+    .mgPanePlane, .mgPaneFlappy { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
 
     /* Arcade game screen */
     .mgPlane { display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-height: 0; width: 100%; overflow: hidden; }
@@ -2124,6 +2501,30 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /** Best flappy-whale score kept in this browser. */
+    function readFlappyBest() {
+      try {
+        if (typeof window === 'undefined' || !window.localStorage) return 0;
+        const raw = window.localStorage.getItem(FLAPPY_BEST_KEY);
+        const value = raw === null ? 0 : Number.parseInt(raw, 10);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    /** Persist a new flappy-whale best score. */
+    function writeFlappyBest(score) {
+      try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        if (!Number.isFinite(score) || score <= 0) return;
+        if (score <= readFlappyBest()) return;
+        window.localStorage.setItem(FLAPPY_BEST_KEY, String(Math.floor(score)));
+      } catch {
+        /* storage disabled */
+      }
+    }
+
     /** Persist a new plane-shooter best score. */
     function writePlaneBest(score) {
       try {
@@ -2237,6 +2638,72 @@ window.__ModuleLoader__.load({
       gain.connect(context.destination);
       osc.start(start);
       osc.stop(start + 0.12);
+    }
+
+    /** A soft upward "bloop" for one flap. */
+    function playFlapSound(enabled) {
+      if (!enabled) return;
+      const context = ensureAudioContext();
+      if (!context) return;
+      const start = context.currentTime;
+      const osc = context.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(340, start);
+      osc.frequency.exponentialRampToValueAtTime(760, start + 0.12);
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.06, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start(start);
+      osc.stop(start + 0.16);
+    }
+
+    /** Two-note ding when a coral gap is passed. */
+    function playScoreSound(enabled) {
+      if (!enabled) return;
+      const context = ensureAudioContext();
+      if (!context) return;
+      const start = context.currentTime;
+      const notes = [
+        { at: 0, frequency: 880 },
+        { at: 0.07, frequency: 1318.5 },
+      ];
+      for (const note of notes) {
+        const at = start + note.at;
+        const osc = context.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(note.frequency, at);
+        const gain = context.createGain();
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(0.05, at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        osc.start(at);
+        osc.stop(at + 0.18);
+      }
+    }
+
+    /** A muffled thud when the whale hits coral or the seabed. */
+    function playFlappyHitSound(enabled) {
+      if (!enabled) return;
+      const context = ensureAudioContext();
+      if (!context) return;
+      const start = context.currentTime;
+      const osc = context.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, start);
+      osc.frequency.exponentialRampToValueAtTime(70, start + 0.24);
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.1, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start(start);
+      osc.stop(start + 0.32);
     }
 
     /** Release the audio context when the plugin unloads. */
@@ -2720,7 +3187,7 @@ window.__ModuleLoader__.load({
       return React.createElement(
         React.Fragment,
         null,
-        React.createElement(ControllerGlyph, { className: 'mgTitleIcon' }),
+        React.createElement(ControllerGlyph, { size: 18, className: 'mgTitleIcon' }),
         label,
       );
     }
@@ -3444,6 +3911,498 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /* ------------------------------------------------ flappy whale (game #3) */
+
+    /** Shelf glyph for the underwater flappy game. */
+    function WhaleGlyph({ size = 16, className }) {
+      return React.createElement(
+        'svg',
+        { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true', className },
+        React.createElement('path', {
+          d: 'M2.1 9.3c0-2.5 2.1-4.6 4.7-4.6 1.9 0 3.5 1 4.3 2.5l1.5-1.4c.4-.4 1.1-.1 1.1.4v5c0 .5-.7.8-1.1.4l-1.5-1.4c-.8 1.5-2.4 2.5-4.3 2.5-2.6 0-4.7-2.1-4.7-4.6Z',
+          stroke: 'currentColor',
+          strokeWidth: '1.15',
+          strokeLinejoin: 'round',
+        }),
+        React.createElement('circle', { cx: '5.4', cy: '8.6', r: '0.75', fill: 'currentColor' }),
+      );
+    }
+
+    /** Rounded-rectangle path helper for the coral columns. */
+    function flappyRoundedRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    /** Paint the whale at its current position, tilted by its vertical speed. */
+    function drawWhaleBird(ctx, bird, elapsed) {
+      const halfW = bird.width / 2;
+      const halfH = bird.height / 2;
+      const tilt = Math.max(-0.5, Math.min(0.75, (bird.vy || 0) / 1100));
+      ctx.save();
+      ctx.translate(bird.x, bird.y);
+      ctx.rotate(tilt * 0.9);
+      /* tail fluke on the left */
+      ctx.beginPath();
+      ctx.moveTo(-halfW * 0.78, 0);
+      ctx.lineTo(-halfW * 1.35, -halfH * 0.75);
+      ctx.lineTo(-halfW * 1.08, 0);
+      ctx.lineTo(-halfW * 1.35, halfH * 0.75);
+      ctx.closePath();
+      ctx.fillStyle = '#3f5be0';
+      ctx.fill();
+      /* body */
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfW, halfH, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#4d6bfe';
+      ctx.fill();
+      /* belly */
+      ctx.beginPath();
+      ctx.ellipse(halfW * 0.08, halfH * 0.34, halfW * 0.72, halfH * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(214, 228, 255, 0.82)';
+      ctx.fill();
+      /* pectoral fin */
+      ctx.beginPath();
+      ctx.moveTo(-halfW * 0.1, halfH * 0.2);
+      ctx.lineTo(-halfW * 0.25, halfH * 0.85);
+      ctx.lineTo(halfW * 0.25, halfH * 0.35);
+      ctx.closePath();
+      ctx.fillStyle = '#3f5be0';
+      ctx.fill();
+      /* eye */
+      ctx.beginPath();
+      ctx.arc(halfW * 0.42, -halfH * 0.22, Math.max(1.6, halfH * 0.2), 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(halfW * 0.48, -halfH * 0.22, Math.max(0.9, halfH * 0.1), 0, Math.PI * 2);
+      ctx.fillStyle = '#101a33';
+      ctx.fill();
+      /* blowhole puffs */
+      const puff = Math.sin((elapsed || 0) * 2.2);
+      if (puff > 0.6 && bird.vy < 160) {
+        ctx.beginPath();
+        ctx.arc(halfW * 0.1, -halfH * 1.15, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(220, 240, 255, 0.65)';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    /** Paint one flappy frame: underwater light, bubbles, coral columns and the whale. */
+    function drawFlappyFrame(ctx, state, view) {
+      if (!ctx || !view) return;
+      const W = FLAPPY_WORLD.width;
+      const H = FLAPPY_WORLD.height;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, view.pxW, view.pxH);
+      ctx.fillStyle = view.gradient || '#07233a';
+      ctx.fillRect(0, 0, view.pxW, view.pxH);
+      ctx.setTransform(view.paintScale, 0, 0, view.paintScale, 0, 0);
+
+      /* angled light shafts from the surface */
+      const elapsed = state.elapsed || 0;
+      ctx.fillStyle = 'rgba(180, 230, 255, 0.06)';
+      for (let i = 0; i < 3; i += 1) {
+        const drift = Math.sin(elapsed * 0.35 + i * 1.7) * 14;
+        const x = 40 + i * 110 + drift;
+        ctx.beginPath();
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x + 52, -20);
+        ctx.lineTo(x + 150, H * 0.72);
+        ctx.lineTo(x + 62, H * 0.72);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      /* rising background bubbles */
+      for (let i = 0; i < state.bubbles.length; i += 1) {
+        const bubble = state.bubbles[i];
+        ctx.beginPath();
+        ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(196, 232, 255, 0.28)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(220, 245, 255, 0.4)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+
+      /* coral columns */
+      for (let i = 0; i < state.pipes.length; i += 1) {
+        const pipe = state.pipes[i];
+        const x = pipe.x - pipe.width / 2;
+        const gapTop = pipe.gapY - pipe.gapHeight / 2;
+        const gapBottom = pipe.gapY + pipe.gapHeight / 2;
+        ctx.fillStyle = '#125566';
+        flappyRoundedRect(ctx, x, -12, pipe.width, gapTop + 12, 10);
+        ctx.fill();
+        flappyRoundedRect(ctx, x, gapBottom, pipe.width, H - gapBottom, 10);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(96, 204, 219, 0.55)';
+        ctx.lineWidth = 2;
+        flappyRoundedRect(ctx, x, -12, pipe.width, gapTop + 12, 10);
+        ctx.stroke();
+        flappyRoundedRect(ctx, x, gapBottom, pipe.width, H - gapBottom, 10);
+        ctx.stroke();
+        /* coral speckles, deterministic from the pipe id */
+        ctx.fillStyle = 'rgba(125, 220, 230, 0.35)';
+        for (let k = 0; k < 4; k += 1) {
+          const dotY = ((pipe.id * 53 + k * 97) % 220) + 30;
+          ctx.beginPath();
+          ctx.arc(x + pipe.width * (0.3 + ((k * 37) % 40) / 100), dotY, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      /* sea floor */
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - 34);
+      for (let x = 0; x <= W; x += 24) {
+        ctx.lineTo(x, H - 34 + Math.sin(x * 0.06) * 6);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = '#0a2f3d';
+      ctx.fill();
+      /* seagrass */
+      ctx.strokeStyle = '#1d7a6a';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i += 1) {
+        const baseX = 26 + i * 66;
+        const sway = Math.sin(elapsed * 1.3 + i) * 6;
+        ctx.beginPath();
+        ctx.moveTo(baseX, H - 26);
+        ctx.quadraticCurveTo(baseX + sway, H - 52, baseX + sway * 1.6, H - 74);
+        ctx.stroke();
+      }
+
+      drawWhaleBird(ctx, state.bird, elapsed);
+    }
+
+    /** Underwater Flappy-Bird style game where the bird is the DSH whale. */
+    function FlappyGame(props) {
+      const { t, active, soundOnRef } = props;
+      const stageRef = React.useRef(null);
+      const canvasRef = React.useRef(null);
+      const gameRef = React.useRef(null);
+      const viewRef = React.useRef(null);
+      const activeRef = React.useRef(active);
+      const phaseRef = React.useRef('idle');
+      const hudRef = React.useRef({ score: 0, best: readFlappyBest(), newBest: false });
+      const bestBeforeRef = React.useRef(readFlappyBest());
+      const resizeRef = React.useRef(null);
+      const [phase, setPhase] = React.useState('idle');
+      const [hud, setHud] = React.useState(hudRef.current);
+
+      React.useEffect(() => {
+        activeRef.current = active;
+        const state = gameRef.current;
+        if (!active) {
+          if (state && state.phase === 'running') {
+            pauseFlappy(state);
+            phaseRef.current = 'paused';
+            setPhase('paused');
+          }
+          return undefined;
+        }
+        const timer = window.setTimeout(() => {
+          if (resizeRef.current) resizeRef.current();
+        }, 30);
+        return () => window.clearTimeout(timer);
+      }, [active]);
+
+      React.useEffect(() => {
+        const stage = stageRef.current;
+        const canvas = canvasRef.current;
+        if (!stage || !canvas) return undefined;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return undefined;
+
+        const state = createFlappyState(((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0));
+        state.best = readFlappyBest();
+        gameRef.current = state;
+        phaseRef.current = state.phase;
+        hudRef.current = { score: 0, best: state.best, newBest: false };
+        setPhase(state.phase);
+        setHud(hudRef.current);
+
+        const dpr = Math.min(2, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
+        let raf = 0;
+        let lastFrame = 0;
+        let stopped = false;
+
+        const resize = () => {
+          const rect = stage.getBoundingClientRect();
+          if (!rect || rect.width < 1 || rect.height < 1) return;
+          const fit = Math.min(rect.width / FLAPPY_WORLD.width, rect.height / FLAPPY_WORLD.height);
+          if (!Number.isFinite(fit) || fit <= 0) return;
+          const cssW = Math.max(1, Math.floor(FLAPPY_WORLD.width * fit));
+          const cssH = Math.max(1, Math.floor(FLAPPY_WORLD.height * fit));
+          canvas.style.width = `${cssW}px`;
+          canvas.style.height = `${cssH}px`;
+          stage.style.setProperty('--mg-plane-width', `${cssW}px`);
+          stage.style.setProperty('--mg-plane-height', `${cssH}px`);
+          const pxW = Math.max(1, Math.round(cssW * dpr));
+          const pxH = Math.max(1, Math.round(cssH * dpr));
+          if (canvas.width !== pxW) canvas.width = pxW;
+          if (canvas.height !== pxH) canvas.height = pxH;
+          const gradient = ctx.createLinearGradient(0, 0, 0, pxH);
+          gradient.addColorStop(0, '#0b4a6b');
+          gradient.addColorStop(0.55, '#07283f');
+          gradient.addColorStop(1, '#03121d');
+          viewRef.current = { pxW, pxH, paintScale: pxW / FLAPPY_WORLD.width, gradient };
+        };
+        resize();
+        resizeRef.current = resize;
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
+        if (observer) observer.observe(stage);
+        window.addEventListener('resize', resize);
+
+        const syncHud = (force) => {
+          const current = hudRef.current;
+          const over = state.phase === 'over';
+          const newBest = current.newBest || (over && state.score > bestBeforeRef.current);
+          if (!force && current.score === state.score && current.best === state.best && current.newBest === newBest) return;
+          const next = { score: state.score, best: state.best, newBest };
+          hudRef.current = next;
+          setHud(next);
+        };
+
+        const onVisibility = () => {
+          if (typeof document !== 'undefined' && document.hidden && state.phase === 'running') {
+            pauseFlappy(state);
+            phaseRef.current = 'paused';
+            setPhase('paused');
+          }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+
+        const frame = (now) => {
+          if (stopped) return;
+          const previous = lastFrame || now;
+          lastFrame = now;
+          let dt = (now - previous) / 1000;
+          if (!Number.isFinite(dt) || dt < 0) dt = 0;
+          if (dt > 0.05) dt = 0.05;
+          if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
+            stepFlappy(state, dt);
+            if (state.lastEvents && state.lastEvents.length > 0) {
+              for (let i = 0; i < state.lastEvents.length; i += 1) {
+                const event = state.lastEvents[i];
+                if (event.type === 'score') playScoreSound(soundOnRef.current);
+                else if (event.type === 'hit') playFlappyHitSound(soundOnRef.current);
+              }
+              state.lastEvents.length = 0;
+            }
+          }
+          if (activeRef.current && viewRef.current) drawFlappyFrame(ctx, state, viewRef.current);
+          if (state.phase !== phaseRef.current) {
+            phaseRef.current = state.phase;
+            if (state.phase === 'over') {
+              if (state.score > 0) writeFlappyBest(state.score);
+              syncHud(true);
+            }
+            setPhase(state.phase);
+          }
+          syncHud(false);
+          raf = window.requestAnimationFrame(frame);
+        };
+        raf = window.requestAnimationFrame(frame);
+
+        const onPointerDown = (event) => {
+          if (!activeRef.current || state.phase !== 'running') return;
+          flapFlappy(state);
+          playFlapSound(soundOnRef.current);
+          if (stageRef.current && typeof stageRef.current.focus === 'function') stageRef.current.focus();
+          event.preventDefault();
+        };
+        canvas.addEventListener('pointerdown', onPointerDown);
+        return () => {
+          stopped = true;
+          window.cancelAnimationFrame(raf);
+          resizeRef.current = null;
+          window.removeEventListener('resize', resize);
+          if (observer) observer.disconnect();
+          document.removeEventListener('visibilitychange', onVisibility);
+          canvas.removeEventListener('pointerdown', onPointerDown);
+          gameRef.current = null;
+        };
+      }, [soundOnRef]);
+
+      const startGame = React.useCallback(() => {
+        const state = gameRef.current;
+        if (!state) return;
+        const storedBest = readFlappyBest();
+        bestBeforeRef.current = storedBest;
+        startFlappy(state, { best: storedBest });
+        if (state.lastEvents) state.lastEvents.length = 0;
+        phaseRef.current = 'running';
+        hudRef.current = { score: 0, best: state.best, newBest: false };
+        setHud(hudRef.current);
+        setPhase('running');
+        if (stageRef.current && typeof stageRef.current.focus === 'function') stageRef.current.focus();
+      }, []);
+
+      const togglePause = React.useCallback(() => {
+        const state = gameRef.current;
+        if (!state) return;
+        if (state.phase === 'running') {
+          pauseFlappy(state);
+          phaseRef.current = 'paused';
+          setPhase('paused');
+        } else if (state.phase === 'paused') {
+          resumeFlappy(state);
+          phaseRef.current = 'running';
+          setPhase('running');
+        }
+      }, []);
+
+      const onKeyDown = React.useCallback(
+        (event) => {
+          const state = gameRef.current;
+          if (!state) return;
+          const key = event.key;
+          if (key === 'p' || key === 'P') {
+            togglePause();
+            event.preventDefault();
+            return;
+          }
+          if (key === ' ' || key === 'ArrowUp' || key === 'w' || key === 'W' || key === 'Enter') {
+            event.preventDefault();
+            if (state.phase === 'running') {
+              flapFlappy(state);
+              playFlapSound(soundOnRef.current);
+            } else if (state.phase === 'idle' || state.phase === 'over') {
+              startGame();
+            }
+          }
+        },
+        [startGame, togglePause],
+      );
+
+      const pauseGlyph =
+        phase === 'paused'
+          ? React.createElement(
+              'svg',
+              { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+              React.createElement('path', { d: 'M5 3.2v9.6L12.4 8 5 3.2Z', fill: 'currentColor' }),
+            )
+          : React.createElement(
+              'svg',
+              { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+              React.createElement('path', { d: 'M4.6 3h2.2v10H4.6zM9.2 3h2.2v10H9.2z', fill: 'currentColor' }),
+            );
+
+      let overlay = null;
+      if (phase === 'idle') {
+        overlay = React.createElement(
+          'div',
+          { className: 'mgPlaneOverlay' },
+          React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('game.flappy')),
+          React.createElement('div', { className: 'mgPlaneOverlayText' }, t('flappy.tipIdle')),
+          React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame }, t('plane.start')),
+        );
+      } else if (phase === 'paused') {
+        overlay = React.createElement(
+          'div',
+          { className: 'mgPlaneOverlay' },
+          React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('plane.pausedTitle')),
+          React.createElement(
+            'div',
+            { className: 'mgActions' },
+            React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: togglePause }, t('plane.resume')),
+            React.createElement('button', { type: 'button', className: 'mgBtn', onClick: startGame }, t('plane.restart')),
+          ),
+        );
+      } else if (phase === 'over') {
+        overlay = React.createElement(
+          'div',
+          { className: 'mgPlaneOverlay' },
+          React.createElement('div', { className: 'mgPlaneOverlayTitle' }, t('plane.overTitle')),
+          React.createElement('div', { className: 'mgPlaneStats' }, t('plane.final', { score: hud.score, best: hud.best })),
+          hud.newBest && React.createElement('div', { className: 'mgPlaneNewBest' }, t('plane.newBest')),
+          React.createElement('button', { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame }, t('plane.restart')),
+        );
+      }
+
+      return React.createElement(
+        'div',
+        { className: 'mgPlane' },
+        React.createElement(
+          'div',
+          { className: 'mgPlaneHud' },
+          React.createElement(
+            'div',
+            { className: 'mgPlaneHudBlock' },
+            React.createElement('span', { className: 'mgPlaneHudLabel' }, t('plane.score')),
+            React.createElement('b', { className: 'mgPlaneHudValue' }, hud.score),
+          ),
+          React.createElement(
+            'div',
+            { className: 'mgPlaneHudBlock' },
+            React.createElement('span', { className: 'mgPlaneHudLabel' }, t('plane.best')),
+            React.createElement('b', { className: 'mgPlaneHudValue' }, hud.best),
+          ),
+          React.createElement(
+            'button',
+            {
+              type: 'button',
+              className: 'mgIconBtn',
+              onClick: togglePause,
+              disabled: phase === 'idle' || phase === 'over',
+              title: phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+              'aria-label': phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+            },
+            pauseGlyph,
+          ),
+        ),
+        React.createElement(
+          'div',
+          { className: 'mgPlaneWrap' },
+          React.createElement(
+            'div',
+            {
+              className: 'mgPlaneStage',
+              ref: stageRef,
+              tabIndex: 0,
+              role: 'application',
+              'aria-label': t('game.flappy'),
+              onKeyDown,
+            },
+            React.createElement('canvas', { className: 'mgPlaneCanvas', ref: canvasRef, width: 360, height: 600 }),
+            overlay,
+          ),
+        ),
+        React.createElement(
+          'div',
+          { className: 'mgActions' },
+          React.createElement(
+            'button',
+            { type: 'button', className: 'mgBtn mgBtnPrimary', onClick: startGame },
+            phase === 'idle' ? t('plane.start') : t('plane.restart'),
+          ),
+          React.createElement(
+            'button',
+            { type: 'button', className: 'mgBtn', onClick: togglePause, disabled: phase === 'idle' || phase === 'over' },
+            phase === 'paused' ? t('plane.resume') : t('plane.pause'),
+          ),
+        ),
+        React.createElement('div', { className: 'mgHint' }, t('flappy.hint')),
+      );
+    }
+
     /* ------------------------------------------------------------ the game page */
 
     /** The right-sidebar tab body: game shelf, board, status, result and actions. */
@@ -3722,16 +4681,16 @@ window.__ModuleLoader__.load({
               React.createElement(
                 'span',
                 { className: 'mgCardIcon' },
-                id === 'gomoku' ? React.createElement(GameBoxGlyph, { size: 17 }) : React.createElement(PlaneGlyph, { size: 17 }),
+                id === 'gomoku' ? React.createElement(GameBoxGlyph, { size: 18 }) : id === 'plane' ? React.createElement(PlaneGlyph, { size: 18 }) : React.createElement(WhaleGlyph, { size: 18 }),
               ),
               React.createElement(
                 'span',
                 { className: 'mgCardText' },
-                React.createElement('span', { className: 'mgCardTitle' }, t(id === 'gomoku' ? 'game.gomoku' : 'game.plane')),
+                React.createElement('span', { className: 'mgCardTitle' }, t(`game.${id}`)),
                 React.createElement(
                   'span',
                   { className: 'mgCardDesc' },
-                  id === 'gomoku' ? t('game.gomoku.desc', { difficulty: difficultyLabel }) : t('game.plane.desc'),
+                  id === 'gomoku' ? t('game.gomoku.desc', { difficulty: difficultyLabel }) : t(`game.${id}.desc`),
                 ),
               ),
             ),
@@ -3840,6 +4799,11 @@ window.__ModuleLoader__.load({
           { className: 'mgPane mgPanePlane', hidden: activeGame !== 'plane' },
           React.createElement(PlaneGame, { t, active: activeGame === 'plane' && tabVisible, soundOnRef: soundRef }),
         ),
+        React.createElement(
+          'div',
+          { className: 'mgPane mgPaneFlappy', hidden: activeGame !== 'flappy' },
+          React.createElement(FlappyGame, { t, active: activeGame === 'flappy' && tabVisible, soundOnRef: soundRef }),
+        ),
       );
     }
 
@@ -3891,7 +4855,7 @@ window.__ModuleLoader__.load({
             'aria-label': label,
             onClick: open,
           },
-          React.createElement(ControllerGlyph, { size: 18 }),
+          React.createElement(ControllerGlyph, { size: 20 }),
         );
       };
     }
@@ -3980,6 +4944,8 @@ window.__ModuleLoader__.load({
       writeActiveGame,
       readPlaneBest,
       writePlaneBest,
+      readFlappyBest,
+      writeFlappyBest,
       plane: {
         PLANE_WORLD,
         PLANE_LIVES,
@@ -3989,6 +4955,15 @@ window.__ModuleLoader__.load({
         resumePlane,
         stepPlane,
         movePlayerBy,
+      },
+      flappy: {
+        FLAPPY_WORLD,
+        createFlappyState,
+        startFlappy,
+        pauseFlappy,
+        resumeFlappy,
+        stepFlappy,
+        flapFlappy,
       },
       readDifficulty,
       readSound,

@@ -77,6 +77,7 @@ function stripModuleSyntax(relPath) {
 
 const engineSource = stripModuleSyntax('src/engine.js');
 const planeSource = stripModuleSyntax('src/plane.js');
+const flappySource = stripModuleSyntax('src/flappy.js');
 const uiSource = stripModuleSyntax('src/ui.js');
 
 function indent(text) {
@@ -98,6 +99,7 @@ window.__ModuleLoader__.load({
 
 ${indent(engineSource)}
 ${indent(planeSource)}
+${indent(flappySource)}
 ${indent(uiSource)}
 ${testExport}
   },

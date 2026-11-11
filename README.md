@@ -11,6 +11,8 @@ A mini-games box for the DSH Web right sidebar. It ships two games:
   triggers a frame-wide celebration with confetti, fireworks and a trophy card.
 - **Sky shooter (打飞机)** — a WeChat-style arcade shooter: drag your plane,
   dodge the descending enemies, auto-fire, chase a personal best.
+- **Flappy whale (鲸鱼飞飞)** — an underwater Flappy-Bird style game where the
+  bird is the DSH whale: click or press Space to swim up through coral gaps.
 
 ## Install
 
@@ -59,8 +61,8 @@ Two ways in, both backed by the same tab type:
   strip reopens the Start page.
 
 The game opens as a tab in the right sidebar: a game shelf at the top (五子棋 /
-打飞机), the selected game below it, and "more games" placeholder row. Switching
-games keeps both games' state while the tab stays open.
+打飞机 / 鲸鱼飞飞), the selected game below it, and "more games" placeholder row.
+Switching games keeps every game's state while the tab stays open.
 
 Because it is a regular tab type, it can be split, floated or moved between
 panes with the sidebar's own controls, and it stays mounted while hidden.
@@ -115,6 +117,20 @@ inside the same right-sidebar page.
   resume or restart from there. Mute silences arcade sound effects (including
   the enemy-fire blip) too.
 
+## Flappy whale
+
+An underwater Flappy-Bird remake where the bird is the DSH whale.
+
+- **Click / tap anywhere on the screen or press Space / ↑ / W** to swim up; the
+  whale sinks under gravity between taps. Arrow keys on the board work too.
+- Swim through the gaps between coral columns; each gap passed scores one
+  point and the current speed slowly increases. Touching a column or the seabed
+  ends the run.
+- The scene is underwater: light shafts, rising bubbles, a wavy seabed with
+  seagrass, and a tilt that follows the whale's vertical speed.
+- Best score is kept in `localStorage`; pause/resume, restart, auto-pause when
+  the tab is hidden, and muted audio all work like the other arcade game.
+
 ## Implementation
 
 | File | Role |
@@ -124,9 +140,10 @@ inside the same right-sidebar page.
 | `index.js` | Host half; no Host behaviour, the Client module owns the rendering. |
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
 | `src/plane.js` | Pure sky-shooter simulation: fixed 360×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
-| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas sky shooter (render/HUD/input incl. enemy bullets), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
+| `src/flappy.js` | Pure flappy-whale simulation: fixed 360×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
+| `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas games (sky shooter incl. enemy bullets, underwater flappy whale), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
-| `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
+| `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/flappy.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
 | `locale/*.json` | Plugin title/description shown by Plugin Manager and Settings (8 locales). |
 | `icon.svg` | Bundle artwork: a white game controller on a deep-blue tile. |
 
@@ -160,6 +177,7 @@ these browser-local preferences in `localStorage`:
 - `dsh.minigames.plane.best.v1` – sky-shooter best score
 - `dsh.minigames.gomoku.save.v1` – Gomoku move list, result and elapsed time
   (removed when a fresh board is started)
+- `dsh.minigames.flappy.best.v1` – flappy-whale best score
 
 ## License
 
@@ -173,6 +191,7 @@ node build.mjs --test             # bundle with internals exposed, for smoke/ui.
 node test/engine.test.mjs         # Gomoku engine unit + self-play tests
 node test/plane.test.mjs          # sky-shooter simulation tests
 node test/plane-enemy-bullets.test.mjs  # enemy fire, aimed shots, bullet damage
+node test/flappy.test.mjs         # flappy-whale physics, pipes, scoring
 node smoke/ui.smoke.mjs           # registration + SSR render + both games' state
 ```
 

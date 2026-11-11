@@ -12,11 +12,13 @@
   </defs>
   <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#bg)"/>
   <rect x="3.5" y="3.5" width="57" height="57" rx="14.5" fill="none" stroke="#ffffff" stroke-opacity="0.12"/>
-  <path
-    d="M20 22H44A8 8 0 0 1 52 30V33C52 38.5 48.6 43 44 43C41 43 38.9 41.6 37 39.7L35.6 38.3H28.4L27 39.7C25.1 41.6 23 43 20 43C15.4 43 12 38.5 12 33V30A8 8 0 0 1 20 22Z"
-    fill="url(#pad)"/>
-  <rect x="19.8" y="31" width="7.4" height="3" rx="1.2" fill="#142b47"/>
-  <rect x="22" y="28.8" width="3" height="7.4" rx="1.2" fill="#142b47"/>
-  <circle cx="40.5" cy="30" r="2.7" fill="#4d8fe0"/>
-  <circle cx="46" cy="34" r="2.7" fill="#ffc53d"/>
+  <g transform="translate(32 32.5) scale(1.16) translate(-32 -32.5)">
+    <path
+      d="M20 22H44A8 8 0 0 1 52 30V33C52 38.5 48.6 43 44 43C41 43 38.9 41.6 37 39.7L35.6 38.3H28.4L27 39.7C25.1 41.6 23 43 20 43C15.4 43 12 38.5 12 33V30A8 8 0 0 1 20 22Z"
+      fill="url(#pad)"/>
+    <rect x="19.8" y="31" width="7.4" height="3" rx="1.2" fill="#142b47"/>
+    <rect x="22" y="28.8" width="3" height="7.4" rx="1.2" fill="#142b47"/>
+    <circle cx="40.5" cy="30" r="2.7" fill="#4d8fe0"/>
+    <circle cx="46" cy="34" r="2.7" fill="#ffc53d"/>
+  </g>
 </svg>

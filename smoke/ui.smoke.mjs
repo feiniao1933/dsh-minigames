@@ -187,12 +187,16 @@ assert.ok(html.includes('mgIconBtn'), 'sound toggle renders');
 assert.ok(html.includes('关闭音效'), 'sound toggle is on by default');
 
 /* Second game: WeChat-style sky shooter */
-assert.equal((html.match(/class="mgCard"/g) ?? []).length, 2, 'two playable games in the shelf');
+assert.equal((html.match(/class="mgCard"/g) ?? []).length, 3, 'three playable games in the shelf');
 assert.ok(html.includes('打飞机'), 'sky shooter card renders');
 assert.ok(html.includes('经典复刻'), 'sky shooter card describes itself');
+assert.ok(html.includes('鲸鱼飞飞'), 'flappy whale card renders');
+assert.ok(html.includes('海底飞行'), 'flappy whale card describes itself');
 assert.ok(html.includes('mgMore'), 'the "more games" placeholder renders');
 assert.ok(html.includes('mgPanePlane'), 'the arcade pane is mounted');
 assert.ok(html.includes('mgPlaneCanvas'), 'the arcade canvas is mounted');
+assert.ok(html.includes('mgPaneFlappy'), 'the flappy pane is mounted');
+assert.equal((html.match(/mgPlaneCanvas/g) ?? []).length, 2, 'both canvas games mount their screens');
 assert.ok(html.includes('开始游戏'), 'the arcade idle overlay offers a start button');
 assert.ok(html.includes('拖动移动'), 'the arcade hint renders');
 assert.ok(html.includes('hidden=""'), 'the inactive pane is hidden from layout');
@@ -235,7 +239,7 @@ const { createGame, applyMove, undoMove, elapsedSeconds, emergencyMove } = modul
 const prefs = moduleExports.__test;
 
 /* Preferences + arcade simulation through the built bundle */
-assert.deepEqual(prefs.GAME_ORDER, ['gomoku', 'plane']);
+assert.deepEqual(prefs.GAME_ORDER, ['gomoku', 'plane', 'flappy']);
 assert.equal(prefs.readActiveGame(), 'gomoku', 'gomoku is the default game');
 prefs.writeActiveGame('plane');
 assert.equal(prefs.readActiveGame(), 'plane', 'selected game round-trips');
@@ -287,6 +291,32 @@ planeSim.stepPlane(shooter2, 0.05);
 assert.ok(Array.isArray(shooter2.enemyBullets) && shooter2.enemyBullets.length === 1, 'enemy fire runs through the bundle');
 assert.ok(shooter2.enemyBullets[0].vy > 0 && shooter2.enemyBullets[0].vx > 0, 'enemy bullet aims down at the player');
 assert.ok(shooter2.lastEvents.some((event) => event.type === 'enemy-shot'), 'enemy-shot event reaches the UI layer');
+
+/* Flappy whale through the built bundle: flap lifts the whale, the run settles. */
+const flappySim = prefs.flappy;
+const whale = flappySim.createFlappyState(21);
+flappySim.startFlappy(whale, { best: 0 });
+assert.equal(whale.phase, 'running');
+const whaleY = whale.bird.y;
+flappySim.flapFlappy(whale);
+assert.ok(whale.bird.vy < 0, 'a flap gives the whale upward speed');
+for (let i = 0; i < 30; i += 1) flappySim.stepFlappy(whale, 1 / 60);
+assert.ok(Number.isFinite(whale.bird.y) && whale.bird.y < whaleY, 'the whale rises after a flap');
+assert.ok(Array.isArray(whale.pipes) && Array.isArray(whale.bubbles), 'pipes and bubbles exist in the state');
+let flappyGuard = 0;
+while (whale.phase === 'running' && flappyGuard < 3600) {
+  if (whale.bird.vy > 120) flappySim.flapFlappy(whale);
+  flappySim.stepFlappy(whale, 1 / 60);
+  flappyGuard += 1;
+}
+assert.ok(whale.phase === 'over' || whale.phase === 'running', 'the flappy run stays in a valid phase');
+assert.ok(Number.isFinite(whale.score), 'flappy score stays finite');
+assert.equal(prefs.readFlappyBest(), 0, 'flappy best starts at zero');
+prefs.writeFlappyBest(7);
+assert.equal(prefs.readFlappyBest(), 7, 'flappy best persists');
+prefs.writeFlappyBest(3);
+assert.equal(prefs.readFlappyBest(), 7, 'flappy best never regresses');
+prefs.writeFlappyBest(0);
 planeSim.startPlane(shooter2, { best: 0 });
 assert.equal(shooter2.enemyBullets.length, 0, 'restart clears enemy bullets');
 assert.deepEqual(prefs.DIFFICULTY_ORDER, ['easy', 'normal', 'hard']);
