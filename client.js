@@ -2632,6 +2632,28 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** Box-level glyph: a game controller, used for the chip, Start capsule and launcher. */
+    function ControllerGlyph({ size = 16, className }) {
+      return React.createElement(
+        'svg',
+        { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true', className },
+        React.createElement('path', {
+          d: 'M4.4 4.4H11.6A2.9 2.9 0 0 1 14.5 7.3V7.9C14.5 9.6 13.1 11 11.4 11C10.4 11 9.7 10.5 9.1 9.8L8.8 9.5H7.2L6.9 9.8C6.3 10.5 5.6 11 4.6 11C2.9 11 1.5 9.6 1.5 7.9V7.3A2.9 2.9 0 0 1 4.4 4.4Z',
+          stroke: 'currentColor',
+          strokeWidth: '1.2',
+          strokeLinejoin: 'round',
+        }),
+        React.createElement('path', {
+          d: 'M4.5 6v2.1M3.5 7h2',
+          stroke: 'currentColor',
+          strokeWidth: '1.05',
+          strokeLinecap: 'round',
+        }),
+        React.createElement('circle', { cx: '10.5', cy: '6.3', r: '0.78', fill: 'currentColor' }),
+        React.createElement('circle', { cx: '11.9', cy: '7.7', r: '0.78', fill: 'currentColor' }),
+      );
+    }
+
     /** Title row of the tab chip: glyph followed by the captured tab title. */
     function GameBoxTitle(props) {
       const info = props.useTabInfo();
@@ -2639,7 +2661,7 @@ window.__ModuleLoader__.load({
       return React.createElement(
         React.Fragment,
         null,
-        React.createElement(GameBoxGlyph, { className: 'mgTitleIcon' }),
+        React.createElement(ControllerGlyph, { className: 'mgTitleIcon' }),
         label,
       );
     }
@@ -3774,7 +3796,7 @@ window.__ModuleLoader__.load({
             order: 40,
             title: () => t('guide.title'),
             description: () => t('guide.description'),
-            icon: GameBoxGlyph,
+            icon: ControllerGlyph,
           },
         ],
       };
@@ -3805,7 +3827,7 @@ window.__ModuleLoader__.load({
             'aria-label': label,
             onClick: open,
           },
-          React.createElement(GameBoxGlyph, { size: 17 }),
+          React.createElement(ControllerGlyph, { size: 18 }),
         );
       };
     }

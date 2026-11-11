@@ -119,7 +119,7 @@ inside the same right-sidebar page.
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
 | `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
 | `locale/*.json` | Plugin title/description shown by Plugin Manager and Settings (8 locales). |
-| `icon.svg` | Bundle artwork: a Gomoku board with the winning stone ringed in gold. |
+| `icon.svg` | Bundle artwork: a white game controller on a deep-blue tile. |
 
 Registration path (public extension seats only):
 
