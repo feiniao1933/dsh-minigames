@@ -6,6 +6,7 @@
   - 插件页：https://dshopen.org/zh/plugins/dsh-minigames/
   - 收录 Issue（已关闭，可继续回复升版）：https://github.com/polang233/dsh-plugin-index/issues/413
   - 已提交 **1.4.4 升级请求**（1.4.3 有「肥鱼大冒险」启动卡死 bug，1.4.4 已修复）：https://github.com/polang233/dsh-plugin-index/issues/413#issuecomment-6825090492
+  - 跟进（2026-11-12 21:57 +08）：评论已补充「固定提交安装验证通过」与归档 SHA-256；维护者暂未回复，市场版本仍为 1.4.3，等待复核升版
   - 版本 1.4.4（修复肥鱼大冒险启动卡死 + 改名），固定提交 `da20544b2d8d7c34b43d282a32810da0177002f4`
 - **awesome-dsh-plugin（dsh-market 目录）**：✅ PR 已合并收录（2026-11-12）
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
