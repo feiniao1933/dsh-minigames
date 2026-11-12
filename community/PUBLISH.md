@@ -12,6 +12,8 @@
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
   - 维护者把分类从 `ui` 调整为 `fun`；条目：`data/plugins/feiniao1933__dsh-minigames.yml`
 - **npm**：未发布（本机未登录 npm；Git 固定提交来源已满足 dshopen 要求）
+  - 因此对外分发当前只有两类来源：GitHub（Git URL / Release tarball）与市场收录（钉 Git 提交）
+  - 已给 Release `v1.4.4` 附加预构建 tarball `dsh-minigames-1.4.4.tgz`（SHA-256 `04a56ebf…`），支持 `dsh plugin add <tarball-url>` 安装，无需 Git
 
 ## 已完成
 

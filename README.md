@@ -18,21 +18,39 @@ A mini-games box for the DSH Web right sidebar. It ships two games:
 ## Install
 
 Requires DSH `0.2.2-rc.1` or newer with the Web client (the right-sidebar plugin
-seats). Install from the public repository:
+seats). The plugin is not on npm yet, so pick one of these sources:
+
+**From the Open Plugin Market (recommended):** open the market page and install
+there — the listing pins a reviewed Git commit:
+<https://dshopen.org/zh/plugins/dsh-minigames/>
+
+**From GitHub (Git URL):**
 
 ```bash
 dsh plugin --profile web add 'github:feiniao1933/dsh-minigames'
 ```
 
-To pin the reviewed revision:
+Pin a revision for a reproducible install (tag or commit):
 
 ```bash
+dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#v1.4.4'
 dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#<commit-sha>'
+```
+
+**From the prebuilt tarball (no Git required):** every release ships the packed
+plugin as an asset, so any HTTPS tarball URL works:
+
+```bash
+dsh plugin --profile web add 'https://github.com/feiniao1933/dsh-minigames/releases/download/v1.4.4/dsh-minigames-1.4.4.tgz'
 ```
 
 Restart `dsh web` if the running page does not pick the new bundle up. The
 plugin's row id is `minigames-box`; it can be disabled again with
 `dsh plugin --profile web remove dsh-minigames`.
+
+> **Version note:** the market listing may lag behind this repository while a
+> new version waits for review. `v1.4.4` fixes a startup freeze in the third
+> game; older pinned commits (e.g. `v1.4.3`) still have it.
 
 ## Screenshots
 
