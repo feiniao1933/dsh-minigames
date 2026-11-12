@@ -6,7 +6,7 @@
   - 插件页：https://dshopen.org/zh/plugins/dsh-minigames/
   - 收录 Issue（已关闭）：https://github.com/polang233/dsh-plugin-index/issues/413
   - 1.2.0 / 1.3.0 的版本升级已按规则回复在原 Issue，等待维护者复核升版
-  - 版本 1.4.3（鲸鱼水下漂浮手感 + 改名 + 画面加宽），固定提交 `6f40ad78056ed7ad8d38e9e1f44fc16c051340dc`
+  - 版本 1.4.4（修复肥鱼大冒险启动卡死 + 改名），固定提交 `da20544b2d8d7c34b43d282a32810da0177002f4`
 - **awesome-dsh-plugin（dsh-market 目录）**：PR 已提交，仓库年龄 gate 即将满足（2026-11-11 14:48 UTC 满 24h）
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
   - 条目：`data/plugins/feiniao1933__dsh-minigames.yml`（category `ui`）
@@ -15,7 +15,7 @@
 ## 已完成
 
 - 公开源码仓库：https://github.com/feiniao1933/dsh-minigames
-- 发布用包：`dsh-minigames@1.4.3`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
+- 发布用包：`dsh-minigames@1.4.4`，MIT，`repository` / `engines.dsh` / `dsh.bundle.patch` / `LICENSE` 齐全
 - `client.js` 构建产物入库；`npm pack` 校验通过
 - 引擎测试 156 断言、UI 冒烟测试通过
 - 当前 profile 已安装并验证（右面板标签、输入框工具栏入口、庆祝层均 active）
@@ -38,6 +38,7 @@
 - [x] 1.4.1：打飞机与鲸鱼飞飞画面加宽（360×600 → 540×600），填满侧栏宽度
 - [x] 1.4.2：游戏改名——打飞机 → 飞机大战、鲸鱼飞飞 → 鲸鱼飞跃
 - [x] 1.4.3：鲸鱼改为水下漂浮手感（慢重力/软拍翅/倾斜缓动/待机浮沉/尾迹气泡）
+- [x] 1.4.4：改名「肥鱼大冒险」；修复启动卡死（绘制函数残留未定义变量导致 rAF 循环中断），并为两个画布游戏加单帧异常兜底
 - [ ] 补充打飞机与获胜庆祝的截图
 - [x] 真实使用截图：`screenshots/game-page.png`（通过 `screenshots.json` 声明），并在 dshopen Issue 评论中提供链接
 - [ ] 补充获胜庆祝动画截图

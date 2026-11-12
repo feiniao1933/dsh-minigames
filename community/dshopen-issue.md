@@ -14,8 +14,8 @@ Git 来源（暂未发布 npm）：
 
 ```text
 仓库：https://github.com/feiniao1933/dsh-minigames
-版本：1.4.3
-提交：6f40ad78056ed7ad8d38e9e1f44fc16c051340dc
+版本：1.4.4
+提交：da20544b2d8d7c34b43d282a32810da0177002f4
 路径：仓库根目录
 ```
 
@@ -43,6 +43,6 @@ Adds a "mini games box" tab to the DSH Web right sidebar with two built-in games
 Logo：包内 icon.svg（也通过 ./icon 导出）
 测试版本：DSH 0.2.2-rc.1，macOS，Web 客户端
 许可证：MIT（仓库内有 LICENSE）
-安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#6f40ad78056ed7ad8d38e9e1f44fc16c051340dc'
+安装（固定提交）：dsh plugin --profile web add 'github:feiniao1933/dsh-minigames#da20544b2d8d7c34b43d282a32810da0177002f4'
 安全：纯 Client 插件，无 webServer 路由、无网络请求、无凭据读写；只写入 3 个 localStorage 偏好键（战绩 / 难度 / 音效）。
 ```
