@@ -11,8 +11,9 @@ A mini-games box for the DSH Web right sidebar. It ships two games:
   triggers a frame-wide celebration with confetti, fireworks and a trophy card.
 - **Sky battle (飞机大战)** — a WeChat-style arcade shooter: drag your plane,
   dodge the descending enemies, auto-fire, chase a personal best.
-- **Whale leap (鲸鱼飞跃)** — an underwater Flappy-Bird style game where the
-  bird is the DSH whale: click or press Space to swim up through coral gaps.
+- **Chubby fish adventure (肥鱼大冒险)** — an underwater Flappy-Bird style
+  game where the DSH whale is the chubby fish: click or press Space to swim up
+  through the coral gaps.
 
 ## Install
 
@@ -61,7 +62,7 @@ Two ways in, both backed by the same tab type:
   strip reopens the Start page.
 
 The game opens as a tab in the right sidebar: a game shelf at the top (五子棋 /
-飞机大战 / 鲸鱼飞跃), the selected game below it, and "more games" placeholder row.
+飞机大战 / 肥鱼大冒险), the selected game below it, and "more games" placeholder row.
 Switching games keeps every game's state while the tab stays open.
 
 Because it is a regular tab type, it can be split, floated or moved between
@@ -117,9 +118,9 @@ inside the same right-sidebar page.
   resume or restart from there. Mute silences arcade sound effects (including
   the enemy-fire blip) too.
 
-## Whale leap (鲸鱼飞跃)
+## Chubby fish adventure (肥鱼大冒险)
 
-An underwater Flappy-Bird remake where the bird is the DSH whale.
+An underwater Flappy-Bird remake where the chubby fish is the DSH whale.
 
 - **Click / tap anywhere on the screen or press Space / ↑ / W** to swim up; the
   whale sinks under gravity between taps. Arrow keys on the board work too.
@@ -142,7 +143,7 @@ An underwater Flappy-Bird remake where the bird is the DSH whale.
 | `index.js` | Host half; no Host behaviour, the Client module owns the rendering. |
 | `src/engine.js` | Pure Gomoku engine: board helpers, win detection, heuristic eval, negamax + iterative deepening with tactical checks and a time budget. |
 | `src/plane.js` | Pure sky-shooter simulation: fixed 540×600 world, seeded RNG, auto-fire, waves and enemy types, enemy aimed/spread fire, AABB collisions, particles, lives/score, pause/over phases. |
-| `src/flappy.js` | Pure flappy-whale simulation: fixed 540×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
+| `src/flappy.js` | Pure chubby-fish (flappy) simulation: fixed 540×600 world, seeded RNG, gravity/flap physics, paired coral pipes, exactly-once scoring, bubbles, pause/over phases. |
 | `src/ui.js` | Client half: tab-type registration, Start capsule, tab title, composer-toolbar launcher, game shelf, Gomoku board + difficulty selector, GOMOKU AI loop, canvas games (sky battle incl. enemy bullets, underwater whale leap), synthesized audio, record + preference persistence, `shell.overlay` celebration. |
 | `client.js` | Generated single-file browser bundle (the loader can only serve one file per package). |
 | `build.mjs` | Concatenates `src/engine.js` + `src/plane.js` + `src/flappy.js` + `src/ui.js` into `client.js` inside one module-loader factory. |
@@ -179,7 +180,7 @@ these browser-local preferences in `localStorage`:
 - `dsh.minigames.plane.best.v1` – sky-shooter best score
 - `dsh.minigames.gomoku.save.v1` – Gomoku move list, result and elapsed time
   (removed when a fresh board is started)
-- `dsh.minigames.flappy.best.v1` – whale-leap best score
+- `dsh.minigames.flappy.best.v1` – chubby-fish best score
 
 ## License
 

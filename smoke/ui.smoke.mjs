@@ -190,7 +190,7 @@ assert.ok(html.includes('关闭音效'), 'sound toggle is on by default');
 assert.equal((html.match(/class="mgCard"/g) ?? []).length, 3, 'three playable games in the shelf');
 assert.ok(html.includes('飞机大战'), 'sky battle card renders');
 assert.ok(html.includes('经典复刻'), 'sky shooter card describes itself');
-assert.ok(html.includes('鲸鱼飞跃'), 'whale leap card renders');
+assert.ok(html.includes('肥鱼大冒险'), 'chubby fish card renders');
 assert.ok(html.includes('海底飞行'), 'flappy whale card describes itself');
 assert.ok(html.includes('mgMore'), 'the "more games" placeholder renders');
 assert.ok(html.includes('mgPanePlane'), 'the arcade pane is mounted');
@@ -319,6 +319,51 @@ assert.equal(prefs.readFlappyBest(), 7, 'flappy best never regresses');
 prefs.writeFlappyBest(0);
 planeSim.startPlane(shooter2, { best: 0 });
 assert.equal(shooter2.enemyBullets.length, 0, 'restart clears enemy bullets');
+
+/* ------------------------------------------------ canvas painters (mock 2D ctx) */
+/* A painter that throws would abort the rAF loop and freeze the game screen, so
+ * execute both painters against a proxy context and fail loudly on any throw. */
+{
+  const target = { fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: 'butt', globalAlpha: 1 };
+  const paintCtx = new Proxy(target, {
+    get(obj, key) {
+      if (key in obj) return obj[key];
+      return () => {};
+    },
+    set(obj, key, value) {
+      obj[key] = value;
+      return true;
+    },
+  });
+  const view = { pxW: 540, pxH: 600, paintScale: 1, clock: 1.2, tilt: 0.2, gradient: { addColorStop() {} } };
+  let paintError = null;
+  try {
+    const flappyPaint = prefs.flappy;
+    const freshFlappy = flappyPaint.createFlappyState(3);
+    flappyPaint.startFlappy(freshFlappy, { best: 0 });
+    prefs.drawFlappyFrame(paintCtx, freshFlappy, view);
+    for (let i = 0; i < 240; i += 1) {
+      if (freshFlappy.bird.vy > 90) flappyPaint.flapFlappy(freshFlappy);
+      flappyPaint.stepFlappy(freshFlappy, 1 / 60);
+    }
+    prefs.drawFlappyFrame(paintCtx, freshFlappy, view);
+    const deadFlappy = flappyPaint.createFlappyState(4);
+    flappyPaint.startFlappy(deadFlappy, { best: 0 });
+    for (let i = 0; i < 400 && deadFlappy.phase === 'running'; i += 1) flappyPaint.stepFlappy(deadFlappy, 1 / 60);
+    prefs.drawFlappyFrame(paintCtx, deadFlappy, view);
+
+    const planePaint = prefs.plane;
+    const livePlane = planePaint.createPlaneState(3);
+    planePaint.startPlane(livePlane, { best: 0 });
+    for (let i = 0; i < 180; i += 1) planePaint.stepPlane(livePlane, 1 / 60);
+    prefs.drawPlaneFrame(paintCtx, livePlane, view);
+    const idlePlane = planePaint.createPlaneState(5);
+    prefs.drawPlaneFrame(paintCtx, idlePlane, view);
+  } catch (error) {
+    paintError = error;
+  }
+  assert.equal(paintError, null, `canvas painters must not throw (${paintError && paintError.message})`);
+}
 assert.deepEqual(prefs.DIFFICULTY_ORDER, ['easy', 'normal', 'hard']);
 for (const id of prefs.DIFFICULTY_ORDER) {
   assert.ok(prefs.DIFFICULTIES[id].maxDepth <= 6 && prefs.DIFFICULTIES[id].timeBudgetMs <= 430);

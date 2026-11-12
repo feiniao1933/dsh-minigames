@@ -50,7 +50,7 @@ const DICT = {
   en: {
     'type.label': 'Mini games box',
     'guide.title': 'Mini games box',
-    'guide.description': 'Gomoku, sky battle and whale leap',
+    'guide.description': 'Gomoku, sky battle and chubby fish',
     'header.title': 'Mini games box',
     'header.subtitle': 'A quick break, right where you work',
     'launcher.title': 'Open the mini games box',
@@ -62,7 +62,7 @@ const DICT = {
     'game.gomoku.desc': 'Human vs AI · {difficulty}',
     'game.plane': 'Sky battle',
     'game.plane.desc': 'Arcade shooter · classic remake',
-    'game.flappy': 'Whale leap',
+    'game.flappy': 'Chubby fish adventure',
     'game.flappy.desc': 'Underwater flappy · tap to rise',
     'flappy.tipIdle': 'Tap or press Space to swim up. Pass the coral gaps.',
     'flappy.hint': 'Click or Space to rise · dodge the coral',
@@ -112,7 +112,7 @@ const DICT = {
   zh: {
     'type.label': '游戏盒子',
     'guide.title': '游戏盒子',
-    'guide.description': '五子棋 + 飞机大战 + 鲸鱼飞跃',
+    'guide.description': '五子棋 + 飞机大战 + 肥鱼大冒险',
     'header.title': '游戏盒子',
     'header.subtitle': '在右侧面板随时来一局',
     'launcher.title': '打开游戏盒子',
@@ -124,7 +124,7 @@ const DICT = {
     'game.gomoku.desc': '人机对弈 · {difficulty}',
     'game.plane': '飞机大战',
     'game.plane.desc': '街机射击 · 经典复刻',
-    'game.flappy': '鲸鱼飞跃',
+    'game.flappy': '肥鱼大冒险',
     'game.flappy.desc': '海底飞行 · 点击上浮',
     'flappy.tipIdle': '点击或按空格让鲸鱼上浮，穿过珊瑚间隙。',
     'flappy.hint': '点击或空格上浮 · 躲开珊瑚',
@@ -1888,37 +1888,46 @@ function PlaneGame(props) {
     };
     document.addEventListener('visibilitychange', onVisibility);
 
+    let frameErrorLogged = false;
     const frame = (now) => {
       if (stopped) return;
-      const previous = lastFrame || now;
-      lastFrame = now;
-      let dt = (now - previous) / 1000;
-      if (!Number.isFinite(dt) || dt < 0) dt = 0;
-      if (dt > 0.05) dt = 0.05;
-      if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
-        stepPlane(state, dt);
-        if (state.lastEvents && state.lastEvents.length > 0) {
-          for (let i = 0; i < state.lastEvents.length; i += 1) {
-            const event = state.lastEvents[i];
-            if (event.type === 'shot') playShotSound(soundOnRef.current);
-            else if (event.type === 'enemy-shot') playEnemyShotSound(soundOnRef.current);
-            else if (event.type === 'explode') playExplosionSound(soundOnRef.current, event.size || 1);
-            else if (event.type === 'damage') playDamageSound(soundOnRef.current);
+      try {
+        const previous = lastFrame || now;
+        lastFrame = now;
+        let dt = (now - previous) / 1000;
+        if (!Number.isFinite(dt) || dt < 0) dt = 0;
+        if (dt > 0.05) dt = 0.05;
+        if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
+          stepPlane(state, dt);
+          if (state.lastEvents && state.lastEvents.length > 0) {
+            for (let i = 0; i < state.lastEvents.length; i += 1) {
+              const event = state.lastEvents[i];
+              if (event.type === 'shot') playShotSound(soundOnRef.current);
+              else if (event.type === 'enemy-shot') playEnemyShotSound(soundOnRef.current);
+              else if (event.type === 'explode') playExplosionSound(soundOnRef.current, event.size || 1);
+              else if (event.type === 'damage') playDamageSound(soundOnRef.current);
+            }
+            state.lastEvents.length = 0;
           }
-          state.lastEvents.length = 0;
         }
-      }
-      if (activeRef.current && viewRef.current) drawPlaneFrame(ctx, state, viewRef.current);
-      if (state.phase !== phaseRef.current) {
-        phaseRef.current = state.phase;
-        if (state.phase === 'over') {
-          if (state.score > 0) writePlaneBest(state.score);
-          syncHud(true);
+        if (activeRef.current && viewRef.current) drawPlaneFrame(ctx, state, viewRef.current);
+        if (state.phase !== phaseRef.current) {
+          phaseRef.current = state.phase;
+          if (state.phase === 'over') {
+            if (state.score > 0) writePlaneBest(state.score);
+            syncHud(true);
+          }
+          setPhase(state.phase);
         }
-        setPhase(state.phase);
+        syncHud(false);
+      } catch (error) {
+        if (!frameErrorLogged) {
+          frameErrorLogged = true;
+          if (typeof console !== 'undefined') console.error('minigames: plane frame failed (animation continues)', error);
+        }
+      } finally {
+        if (!stopped) raf = window.requestAnimationFrame(frame);
       }
-      syncHud(false);
-      raf = window.requestAnimationFrame(frame);
     };
     raf = window.requestAnimationFrame(frame);
 
@@ -2255,7 +2264,7 @@ function drawWhaleBird(ctx, bird, view, phase) {
   ctx.fillStyle = '#101a33';
   ctx.fill();
   /* blowhole puffs */
-  const puff = Math.sin((elapsed || 0) * 2.2);
+  const puff = Math.sin(clock * 2.2);
   if (puff > 0.6 && bird.vy < 160) {
     ctx.beginPath();
     ctx.arc(halfW * 0.1, -halfH * 1.15, 2.2, 0, Math.PI * 2);
@@ -2463,41 +2472,50 @@ function FlappyGame(props) {
     };
     document.addEventListener('visibilitychange', onVisibility);
 
+    let frameErrorLogged = false;
     const frame = (now) => {
       if (stopped) return;
-      const previous = lastFrame || now;
-      lastFrame = now;
-      let dt = (now - previous) / 1000;
-      if (!Number.isFinite(dt) || dt < 0) dt = 0;
-      if (dt > 0.05) dt = 0.05;
-      const view = viewRef.current;
-      if (view) {
-        view.clock += dt;
-        const targetTilt = Number.isFinite(state.bird.angle) ? state.bird.angle : 0;
-        view.tilt += (targetTilt - (view.tilt || 0)) * Math.min(1, dt * 4.5);
-      }
-      if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
-        stepFlappy(state, dt);
-        if (state.lastEvents && state.lastEvents.length > 0) {
-          for (let i = 0; i < state.lastEvents.length; i += 1) {
-            const event = state.lastEvents[i];
-            if (event.type === 'score') playScoreSound(soundOnRef.current);
-            else if (event.type === 'hit') playFlappyHitSound(soundOnRef.current);
+      try {
+        const previous = lastFrame || now;
+        lastFrame = now;
+        let dt = (now - previous) / 1000;
+        if (!Number.isFinite(dt) || dt < 0) dt = 0;
+        if (dt > 0.05) dt = 0.05;
+        const view = viewRef.current;
+        if (view) {
+          view.clock += dt;
+          const targetTilt = Number.isFinite(state.bird.angle) ? state.bird.angle : 0;
+          view.tilt += (targetTilt - (view.tilt || 0)) * Math.min(1, dt * 4.5);
+        }
+        if (activeRef.current && state.phase === 'running' && !(typeof document !== 'undefined' && document.hidden)) {
+          stepFlappy(state, dt);
+          if (state.lastEvents && state.lastEvents.length > 0) {
+            for (let i = 0; i < state.lastEvents.length; i += 1) {
+              const event = state.lastEvents[i];
+              if (event.type === 'score') playScoreSound(soundOnRef.current);
+              else if (event.type === 'hit') playFlappyHitSound(soundOnRef.current);
+            }
+            state.lastEvents.length = 0;
           }
-          state.lastEvents.length = 0;
         }
-      }
-      if (activeRef.current && viewRef.current) drawFlappyFrame(ctx, state, viewRef.current);
-      if (state.phase !== phaseRef.current) {
-        phaseRef.current = state.phase;
-        if (state.phase === 'over') {
-          if (state.score > 0) writeFlappyBest(state.score);
-          syncHud(true);
+        if (activeRef.current && viewRef.current) drawFlappyFrame(ctx, state, viewRef.current);
+        if (state.phase !== phaseRef.current) {
+          phaseRef.current = state.phase;
+          if (state.phase === 'over') {
+            if (state.score > 0) writeFlappyBest(state.score);
+            syncHud(true);
+          }
+          setPhase(state.phase);
         }
-        setPhase(state.phase);
+        syncHud(false);
+      } catch (error) {
+        if (!frameErrorLogged) {
+          frameErrorLogged = true;
+          if (typeof console !== 'undefined') console.error('minigames: flappy frame failed (animation continues)', error);
+        }
+      } finally {
+        if (!stopped) raf = window.requestAnimationFrame(frame);
       }
-      syncHud(false);
-      raf = window.requestAnimationFrame(frame);
     };
     raf = window.requestAnimationFrame(frame);
 
@@ -3236,6 +3254,8 @@ const __mgTestExports = {
     stepPlane,
     movePlayerBy,
   },
+  drawPlaneFrame,
+  drawFlappyFrame,
   flappy: {
     FLAPPY_WORLD,
     createFlappyState,

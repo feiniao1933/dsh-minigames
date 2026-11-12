@@ -1,7 +1,7 @@
 {
   "name": "dsh-minigames",
-  "version": "1.4.3",
-  "description": "Mini games box for the DSH right sidebar: Gomoku human vs AI with three difficulties, a WeChat-style sky battle and an underwater whale-leap game, with sounds and a victory celebration.",
+  "version": "1.4.4",
+  "description": "Mini games box for the DSH right sidebar: Gomoku human vs AI with three difficulties, a WeChat-style sky battle and an underwater chubby-fish flappy game, with sounds and a victory celebration.",
   "keywords": [
     "dsh",
     "dsh-plugin",
