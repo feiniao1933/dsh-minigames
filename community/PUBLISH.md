@@ -2,14 +2,14 @@
 
 ## 发布渠道
 
-- **Open Plugin Market（dshopen.org）**：✅ 已收录（2026-11-11，维护者确认按 1.1.1 收录）
+- **Open Plugin Market（dshopen.org）**：✅ 已收录（2026-11-12 维护者确认按 **1.4.3** 收录）
   - 插件页：https://dshopen.org/zh/plugins/dsh-minigames/
-  - 收录 Issue（已关闭）：https://github.com/polang233/dsh-plugin-index/issues/413
-  - 1.2.0 / 1.3.0 的版本升级已按规则回复在原 Issue，等待维护者复核升版
+  - 收录 Issue（已关闭，可继续回复升版）：https://github.com/polang233/dsh-plugin-index/issues/413
+  - 已提交 **1.4.4 升级请求**（1.4.3 有「肥鱼大冒险」启动卡死 bug，1.4.4 已修复）：https://github.com/polang233/dsh-plugin-index/issues/413#issuecomment-6825090492
   - 版本 1.4.4（修复肥鱼大冒险启动卡死 + 改名），固定提交 `da20544b2d8d7c34b43d282a32810da0177002f4`
-- **awesome-dsh-plugin（dsh-market 目录）**：PR 已提交，仓库年龄 gate 即将满足（2026-11-11 14:48 UTC 满 24h）
+- **awesome-dsh-plugin（dsh-market 目录）**：✅ PR 已合并收录（2026-11-12）
   - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14033
-  - 条目：`data/plugins/feiniao1933__dsh-minigames.yml`（category `ui`）
+  - 维护者把分类从 `ui` 调整为 `fun`；条目：`data/plugins/feiniao1933__dsh-minigames.yml`
 - **npm**：未发布（本机未登录 npm；Git 固定提交来源已满足 dshopen 要求）
 
 ## 已完成
@@ -29,7 +29,8 @@
 - [x] dshopen 收录申请 Issue（`[plugin-add] dsh-minigames`）
 - [x] awesome-dsh-plugin 单文件 PR
 - [x] 1.1.0：新增微信经典「打飞机」小游戏 + 游戏架切换
-- [ ] 等 awesome CI 的仓库年龄 gate（仓库 2026-11-10 创建，约 24h 后可复跑）
+- [x] awesome-dsh-plugin PR 已合并
+- [ ] 等 dshopen 按 1.4.4 复核升版
 - [x] 1.1.1：打飞机改为微信极简画风，修复结束画面抖动与游戏画面遮挡
 - [x] 1.2.0：敌机开火（战斗机瞄准射击、重型机三向散射），新增 31 项弹幕测试
 - [x] 1.2.1：更换游戏盒子图标（白色手柄 + 深蓝底），标签页/开始页/工具栏同步
